@@ -380,7 +380,7 @@ def calculateRayPaths(os, bundleDict, bundlePropDict, sysseq):
     return x, y
 
 def plotBundles(s, initialbundle, sysseq, 
-                ax, pn, up, color="blue"):
+                ax, pn, up2, color="blue"):
     '''
     EDITED BY LEANDRO 29.11.2019
     os: OpticalSystem-object optimization
@@ -404,6 +404,6 @@ def plotBundles(s, initialbundle, sysseq,
         for j in range(0,n):
             r2 = s.seqtrace(initialbundle[i][j], sysseq)
             for r in r2:
-                r.draw2d(ax, color="green", plane_normal=pn, up=up)
+                r.draw2d(ax, color="green", plane_normal=pn, up=up2)
 
-    s.draw2d(ax, color="grey", vertices=50, plane_normal=pn, up=up) 
+    s.draw2d(ax, color="grey", vertices=50, plane_normal=pn, up=up2) 
