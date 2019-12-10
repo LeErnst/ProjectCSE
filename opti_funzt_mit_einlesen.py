@@ -60,7 +60,7 @@ fi1=inout()
 #create optical system
 s = OpticalSystem.p()
 
-#create for each surface a coordinate system
+#create for each surface a coordinate system which includes loading the surfaces
 cs=fi1.create_coordinate_systems(s)
 
 #create optical element
@@ -79,7 +79,8 @@ s.addElement(elem1.name, elem1)
 
 # II---------------------- optical system analysis
 # --- 1. elem
-SurfNamesList = list(s.elements[elem1.name].surfaces.keys())
+SurfNamesList=fi1.get_SurfNameList()
+print(SurfNamesList)
 
 Elem1List = (elem1.name, [ (SurfNamesList[2]   , {"is_stop": True}),
                            (SurfNamesList[1]   , {}),
@@ -87,6 +88,7 @@ Elem1List = (elem1.name, [ (SurfNamesList[2]   , {"is_stop": True}),
                            (SurfNamesList[4]   , {}),
                            (SurfNamesList[5]   , {}),
                            (SurfNamesList[0]   , {})] )
+
 
 # --- 2. elem
 # ...no second OptElem
@@ -186,31 +188,9 @@ plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 # IV ----------- optimization
 # ----- define optimizable variables
-'''
-all optimizable variables: ["decz", "decx", "decy", "tiltx", "tilty", "tiltz",
-                            "curvature", "cc"]
-'''
-
 #######################################NeuAnfang##################################
 fi1.setup_variables(s,elem1.name)
 #######################################NeuEnde##################################
-
-##################die zeile oben ersetzt das unten auskommentierte
-#optiVarsDict = {}
-## watch out: 0 is the aperture
-##            1 is the first surface and so on
-#
-## --- 1. Surface
-#optiVarsDict[SurfNamesList[1]] = {"curvature": [-0.35, 0.35],
-#                                  "decz"     : [ 1.0 , 3.9  ]}
-## --- 3. Surface
-#optiVarsDict[SurfNamesList[3]] = {"curvature": [-0.35, 0.35  ],
-#                                  "decz"     : [ 5.5 , 8.    ],
-#                                  "decx"     : [-0.5 , 0.5  ]}
-#
-#
-## --- call auxiliary function to set optimizable variables
-#setOptimizableVariables(s, elem1.name, optiVarsDict, SurfNamesList) 
 
 # --- print table of optimizable variables
 # this is actually quite nice to get a look at the vars, especially at the end
