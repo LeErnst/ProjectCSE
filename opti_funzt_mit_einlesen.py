@@ -178,10 +178,6 @@ ax1.axis('equal')
 ax2.axis('equal')
 
 # --- plot the bundles and draw the original system
-print("initialbundle=")
-print(len(initialbundle))
-print("sysseq=")
-print(len(sysseq))
 plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 
@@ -244,10 +240,8 @@ s = optimi.run()
 ## V----------- plot the optimized system
 #
 ## --- plot the bundles and draw the system
-print("initialbundle=")
-print(len(initialbundle))
-print("sysseq=")
-print(len(sysseq))
+#TODO wenn fogende zeiel auskommentiert wird dauert das plotten ewig, obwhl die 
+#funktion bereits vorher aufgerufen wurde und (relativ) schnell geht????????
 #plotBundles(s, initialbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
