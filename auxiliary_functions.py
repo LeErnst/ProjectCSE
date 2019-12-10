@@ -33,7 +33,7 @@ the input/output data can be determined
 #---------------------------------------
 class inout:
     def __init__(self):
-        self.globpath="../Input_Output/"
+        self.globpath="./Input_Output/"
         fileobj = open(self.globpath+"file_data", "r")
         readdata=[]
         for line in fileobj:
