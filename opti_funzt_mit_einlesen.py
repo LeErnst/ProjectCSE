@@ -52,7 +52,8 @@ from auxiliary_functions import calculateRayPaths,\
                                 setOptimizableVariables,\
                                 calcBundleProps,\
                                 plotBundles,\
-                                inout 
+                                inout,\
+                                plotSpotDia
 #meritfunction and initialbundle
 from aux_merit_bundle import buildInitialbundle, get_bundle_merit
 
@@ -245,12 +246,10 @@ s = optimi.run()
 ## V----------- plot the optimized system
 #
 ## --- plot the bundles and draw the system
-#TODO wenn fogende zeiel auskommentiert wird dauert das plotten ewig, obwhl die 
-#funktion bereits vorher aufgerufen wurde und (relativ) schnell geht????????
 plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
-
+plotSpotDia(osa, numrays, rays_dict, wavelength)
 #numrays_spot = 200
 #for i in bundleDict:
 #    osa.aim(numrays_spot, bundleDict[i][1], wave=bundleDict[i][2])

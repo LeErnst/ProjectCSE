@@ -407,3 +407,29 @@ def plotBundles(s, initialbundle, sysseq,
                 r.draw2d(ax, color="green", plane_normal=pn, up=up2)
 
     s.draw2d(ax, color="grey", vertices=50, plane_normal=pn, up=up2) 
+
+def plotSpotDia(osa, numrays, rays_dict, wavelength):
+
+    #Set defaults for dictionary
+    rays_dict.setdefault("startx", [0])
+    rays_dict.setdefault("starty", [0])
+    rays_dict.setdefault("startz", [-7])
+    rays_dict.setdefault("angley", [0])
+    rays_dict.setdefault("anglex", [0])
+    rays_dict.setdefault("rasterobj", raster.RectGrid())
+    rays_dict.setdefault("radius", [15])
+
+    #Iterate over all entries
+    for i in rays_dict["startx"] :
+        for j in rays_dict["starty"] :
+            for k in rays_dict["startz"] :
+                for l in rays_dict["angley"] :
+                    for m in rays_dict["anglex"] :
+                        for n in rays_dict["radius"] :
+                            #Setup dict for current Bundle
+                            bundle_dict = {"startx":i, "starty":j, "startz":k,
+                                           "angley":l, "anglex":m, "radius":n,
+                                           "rasterobj":rays_dict["rasterobj"]}
+                            for o in wavelength :
+                                osa.aim(numrays, bundle_dict, wave=o)
+                                osa.drawSpotDiagram()
