@@ -9,6 +9,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
+# --- copy function for copying the initialbundle
+from copy import deepcopy
+
 # --- optical system and raytracing
 from pyrateoptics.raytracer.optical_system              import OpticalSystem
 from pyrateoptics.raytracer.optical_element             import OpticalElement
@@ -107,11 +110,13 @@ default is 0.0
 # ----- define raybundles
 # every parameter needs to be an array/list! e.g. [7] instead of 7
 rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
-	         "anglex": [0.03], "raster":raster.RectGrid()}
+	         "anglex": [0.03, -0.05], "raster":raster.RectGrid()}
 #rastertype = raster.RectGrid()
 #define wavelengths
 wavelength = [0.5875618e-3]#, 0.4861327e-3]#, 0.6562725e-3]
 numrays = 10
+wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
+numrays = 50
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength)
@@ -162,8 +167,10 @@ ax1.axis('equal')
 ax2.axis('equal')
 
 # --- plot the bundles and draw the original system
+# first it is necessary to copy the initialbundle, as it's gonna be changed
+# inside of the seqtrace function (called inside of plotBundles)
+testbundle = deepcopy(initialbundle)
 plotBundles(s, initialbundle, sysseq, ax1, pn, up)
-
 
 
 # IV ----------- optimization
@@ -226,7 +233,7 @@ s = optimi.run()
 ## --- plot the bundles and draw the system
 #TODO wenn fogende zeiel auskommentiert wird dauert das plotten ewig, obwhl die 
 #funktion bereits vorher aufgerufen wurde und (relativ) schnell geht????????
-#plotBundles(s, initialbundle, sysseq, ax2, pn, up)
+plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
 
@@ -240,4 +247,3 @@ s = optimi.run()
 ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 
 plt.show()
-
