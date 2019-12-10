@@ -63,8 +63,8 @@ class inout:
         #added with an var. all possible varialbe items have to mentioned below 
         self.NamesOptVariable=["decxvar","decyvar","deczvar","tiltxvar",\
                 "tiltyvar","tiltzvar","ccvar","curvaturevar"]
-    def get_SurfNameList(self):
-        return self.SurfNameList
+
+
 
     def set_add(self):
         self.mode=0
@@ -269,6 +269,17 @@ class inout:
                             curvOrCc.setInterval(left=optiVarsDict[surfnames]\
                                     [params[:-3]][0], \
                                     right=optiVarsDict[surfnames][params[:-3]][1])
+    
+    def get_sysseq(self, elem1):
+        templist=[]
+        for i in range(len(self.SurfNameList)):
+            if self.get_val("isstop",i):
+                templist.append((self.get_val("name",i), {"is_stop":True}))
+            else:
+                templist.append((self.get_val("name",i), {}))
+            
+        sysseq=[(elem1.name,templist)]
+        return sysseq 
     
 
 def str_to_class(classname):

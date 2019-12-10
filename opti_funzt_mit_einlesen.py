@@ -83,24 +83,8 @@ s.addElement(elem1.name, elem1)
 
 # II---------------------- optical system analysis
 # --- 1. elem
-SurfNamesList=fi1.get_SurfNameList()
-print(SurfNamesList)
 
-Elem1List = (elem1.name, [ (SurfNamesList[0]   , {"is_stop": True}),
-                           (SurfNamesList[1]   , {}),
-                           (SurfNamesList[2]   , {}),
-                           (SurfNamesList[3]   , {}),
-                           (SurfNamesList[4]   , {}),
-                           (SurfNamesList[5]   , {})] )
-
-
-# --- 2. elem
-# ...no second OptElem
-
-# ----------- define element sequence
-sysseq = [Elem1List]
-#print("sysseq")
-#print(sysseq)
+sysseq=fi1.get_sysseq(elem1);
 
 # ----------- define optical system analysis object
 osa = OpticalSystemAnalysis(s, sysseq)
@@ -130,6 +114,8 @@ rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
 	         "anglex": [0.03, -0.05], "raster":raster.RectGrid()}
 #rastertype = raster.RectGrid()
 #define wavelengths
+wavelength = [0.5875618e-3]#, 0.4861327e-3]#, 0.6562725e-3]
+numrays = 10
 wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
 numrays = 50
 
