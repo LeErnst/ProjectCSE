@@ -233,7 +233,7 @@ s = optimi.run()
 ## --- plot the bundles and draw the system
 #TODO wenn fogende zeiel auskommentiert wird dauert das plotten ewig, obwhl die 
 #funktion bereits vorher aufgerufen wurde und (relativ) schnell geht????????
-#plotBundles(s, testbundle, sysseq, ax2, pn, up)
+plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
 
