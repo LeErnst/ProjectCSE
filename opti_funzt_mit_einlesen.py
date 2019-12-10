@@ -82,12 +82,12 @@ s.addElement(elem1.name, elem1)
 SurfNamesList=fi1.get_SurfNameList()
 print(SurfNamesList)
 
-Elem1List = (elem1.name, [ (SurfNamesList[2]   , {"is_stop": True}),
+Elem1List = (elem1.name, [ (SurfNamesList[0]   , {"is_stop": True}),
                            (SurfNamesList[1]   , {}),
+                           (SurfNamesList[2]   , {}),
                            (SurfNamesList[3]   , {}),
                            (SurfNamesList[4]   , {}),
-                           (SurfNamesList[5]   , {}),
-                           (SurfNamesList[0]   , {})] )
+                           (SurfNamesList[5]   , {})] )
 
 
 # --- 2. elem
