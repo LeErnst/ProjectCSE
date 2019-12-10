@@ -1,0 +1,227 @@
+
+https://git-scm.com/book/de/v2/GitHub-Ein-Projekt-betreuen
+
+
+install:
+
+sudo apt install git
+
+festlegen wer ihr seid:
+
+git config --global user.email "name1.name2@uni-ulm.de"
+git config --global user.name "Name1 Name2"
+git config --global core.editor vim
+
+git repository erstellen (Depot, Quelle = verwaltetes Verzeichnis zur 
+Speicherung von Dateien):
+
+git init
+
+bereits existierende Dateien versionieren:
+festlegen welche dateien versioniert werden sollen:
+
+git add dateiname
+
+einen snapshot (commit) erstellen (alle dateien werden gesichert, dateien die 
+verändert wurden werden nur einmal gespeichert):
+
+git commit -m 'first project version'
+
+repository klonen (um an einem projekt mitzuarbeiten,
+alle daten werden auf den lokalen Rechner geladen):
+dabei legt git das verzeichnis an initialisiert in diesem ein .git verzeichnis
+lädt alle daten des repository runter, und checkt eine arbeitskopie der 
+aktuellsten version aus mit der gearbeitet werden kann.
+
+git clone url zielverzeichnis
+Beispiel:
+git clone https://github.com/libgit2/libgit2 mein_verzeichnis
+
+es gibt dabei verschiedene protokolle, hier wurde das https:// verwendet
+es gibt aber auch git:// oder user@server:path/to/repo.git
+
+Datei-Zustände: tracked oder untracked: Änderungen werden verfolgt oder eben nicht
+d.h. kurz gesagt tracked files kennt git
+Sobald versionierte Dateien bearbeitet werden erkennt Git diese als modifiziert,
+weil sie sich im Vergleich zum letzten Commit verändert haben.
+Also: umodified ---> modified ----> staged ---commit---> unmodified
+Zustand von Dateien prüfen:
+Dabei wird angezeigt auf welchem Zweig (branch) man arbeitet ob es up-to-date ist
+oder ob es unversionierte, veränderte Dateien gibt, diese können dann für den
+nächsten commit vorgemerkt werden mit add
+
+git status
+
+wenn eine ungetrackte datei mit git add zu versionsverwaltung hinzugefügt wurde,
+dann wird der Schnappschuss den Zustand der Datei zum Zeitpunkt des Befehls
+git add festhalten. git add akzeptiert auch Pfadnamen, dann werden ALLE Dateien 
+in diesem Pfad hinzugefügt. der Befehl git add hat mehrere Bedeutungen, zum einen
+kann man unversionierte Dateien hinzufügen, zum anderen können auch dateien für
+den nächsten commit vorgemerkt werden. Wenn eine Datei mit git add in den vor-
+gemerkten Zustand versetzt wird und dann nochmal verändert wird, dann ist diese
+Datei sowohl im veränderten Zustand, als auch im vorgemerkten, denn die Änderungen
+die nach git add durchgeführt wurden sind nicht vorgemerkt für den nächsten Commit.
+Um die Änderungen wieder zu erfassen muss wieder git add ausgeführt werden.
+
+git hat auch ein kurzes status kommando:
+
+git status -s
+??: unversioniert
+M grün: modified und staged(vorgemerkt)
+M rot: nur modified aber nicht staged
+MM: staged und modified
+
+
+Dateien ignorieren (z.B. automatisch generierte Dateien):
+Dazu wird eine .gitignore Datei erstellt mit dem Inhalt (Beispiel):
+# ignore all .a and .o files
+.[oa]
+# ingnore all .log files
+.log
+# wird ignoriert
+ wird ebenfalls ignoriert, (Leerzeichen am Anfang)
+# do track lib.a, even though you're ignoring .a files above
+!lib.a
+# only ignore the TODO file in the current directory, not subdir/TODO
+/TODO
+# ignore all files in any directory named build
+build/
+# ignore doc/notes.txt, but not doc/server/arch.txt
+doc/*.txt
+# ignore all .pdf files in the doc/ directory and any of its subdirectories
+doc/**/*.pdf
+
+
+Abgleich was genau sich geändert hat(ohne Argumente):
+Dieses Kommando vergleicht, was sich in Ihrem Arbeitsverzeichnis befindet, 
+mit dem, was sich in Ihrer Staging-Area befindet
+Änderungen Sie vorgenommen haben, die noch nicht „gestaged“ sind. Sind die 
+Änderungen bereits staged, dann wird git diff nichts angeben!
+
+git diff
+
+Was wurde zum Commit vorgemerkt:
+Dieser Befehl vergleicht Ihre zum Commit vorgemerkten Änderungen mit Ihrem letzten Commit
+
+git diff --staged
+
+Änderungen committen:
+Damit wird der Editor geöffnet und alles wird aufgelistet. Wird der Editor
+verlassen erstellt git den Commit. Es muss aber eine Nachricht in die erste 
+Zeile geschrieben werden, ansonsten wird git keinen Commit erstellen!!
+
+git commit
+
+Wissen welche Änderungen committed werden:
+
+git commit -v
+
+
+Änderungen committen ohne Editor und mit Kommentar zu Änderung:
+
+git commit -m 'Kommentar zB: fixed function optical_element.py'
+
+Überspringen des Vormerkens für einzelne Dateien:
+Damit werden alle Dateien die git kennt, also versioniert sind automatisch committen
+Vorsicht vor ungewollten Änderungen!
+
+git commit -a -m 'added new benchmarks'
+
+Datei aus Git und aus dem Arbeitsverzeichnis löschen:
+Damit ist die Datei beim nächsten Commit aus Git entfernt und nicht mehr da!!!
+
+git rm datei.py
+
+Ist die Datei bereits im staged Zustand muss das Entfernen mit -f erzwungen werden
+
+git rm -f datei.py
+
+Datei behalten, aber aus Staging-Area entfernen:
+
+git reset HEAD datei.py
+
+Änderungen verwerfen (wichtig beim Löschen einer Datei):
+Git ERSETZT die Datei durch die letzte die Committed wurde
+
+git checkout datei.py
+
+
+Commit-Historie:
+
+git log
+nur die letzten zwei Änderungen
+git log -2
+
+
+Letztes Commit-Kommando wiederholen:
+Änderung muss trotzdem in die staged-Area überführt werden
+
+git commit --amend
+
+oder vergessene Datei zum letzten commit hinzufügen
+
+git add forgotten_file
+git commit --amend
+
+
+Note: Fast alles was committed wurde kann wiederhergestellt werden. Es muss aber
+zumindest committed worden sein.
+
+Remote-Repositorys sind Versionen Ihres Projekts, die im Internet oder im 
+Netzwerk irgendwo gehostet werden. Sie können mehrere einrichten, von denen 
+jedes in der Regel entweder schreibgeschützt oder beschreibbar ist. 
+Zusammenarbeit mit anderen erfordert die Verwaltung dieser Remote-Repositorys 
+und das Pushing und Pulling von Daten zu und von den Repositorys, wenn Sie Ihre 
+Arbeit teilen möchten. 
+
+Auflisten von Remotes mit Kurznamen:
+
+git remote -v
+
+
+Informationen abrufen die Jemand hat, aber die noch nicht in deinem Repository
+enthalten sind:
+
+git fetch https://github.com/paulboone/ticgit
+
+Fetching und Pulling:
+Zieht alle Daten von dem Projekt runter die sie noch nicht haben. Sie müssen
+die Daten manuell zusammenführen, die Änderungen sind aber markiert!
+
+git fetch remote
+
+Daten automatisch mit ihren Branch zusammenführen:
+
+git pull remote branch
+
+
+Projekt teilen:
+Sie müssen es zum Upstream verschieben (push):
+es werden alle commit die sie durchgeführt haben, übertragen
+
+git push remote branch
+
+wenn man mit git clone gearbeitet hat wurde automatisch der origin master erstellt
+Schreibzugriff muss erteilt sein und es darf in der Zwischenzeit noch niemand
+anderes gepusht haben (es dürfen nicht zwei Leute pushen, d.h. sie müssen zuerst
+die gepushte Version holen, in ihre einarbeiten und dann können sie pushen)
+
+git push origin master
+
+
+git Tags:
+jedes commit kann ein tag bekommen, -lw bedeutet light weight tag, also weniger information
+
+git tag v1.4-lw
+
+Anzeigen der tags
+
+git show
+
+
+
+
+
+
+
+
