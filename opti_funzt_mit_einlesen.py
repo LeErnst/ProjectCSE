@@ -250,10 +250,6 @@ plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
 plotSpotDia(osa, numrays, rays_dict, wavelength)
-#numrays_spot = 200
-#for i in bundleDict:
-#    osa.aim(numrays_spot, bundleDict[i][1], wave=bundleDict[i][2])
-#    osa.drawSpotDiagram()
 
 
 # get a look at the vars
