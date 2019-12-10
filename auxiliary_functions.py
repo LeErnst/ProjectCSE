@@ -63,6 +63,8 @@ class inout:
         #added with an var. all possible varialbe items have to mentioned below 
         self.NamesOptVariable=["decxvar","decyvar","deczvar","tiltxvar",\
                 "tiltyvar","tiltzvar","ccvar","curvaturevar"]
+    def get_SurfNameList(self):
+        return self.SurfNameList
 
     def set_add(self):
         self.mode=0
