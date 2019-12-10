@@ -379,10 +379,10 @@ def calculateRayPaths(os, bundleDict, bundlePropDict, sysseq):
     
     return x, y
 
-
-def plotBundles(os, bundleDict, bundlePropDict_plot, sysseq, 
+def plotBundles(s, initialbundle, sysseq, 
                 ax, pn, up, color="blue"):
     '''
+    EDITED BY LEANDRO 29.11.2019
     os: OpticalSystem-object optimization
     bundleDict: all bundle data in a dictionary
     bundlePropDict_plot: dictionary which contains all the bundle properties
@@ -393,15 +393,17 @@ def plotBundles(os, bundleDict, bundlePropDict_plot, sysseq,
     draws all rays in the bundleDict and the optical system os
     '''
 
-    for i in bundlePropDict_plot.keys():
-        bundle = RayBundle(x0      = bundlePropDict_plot[i][0], 
-                           k0      = bundlePropDict_plot[i][1],
-                           Efield0 = bundlePropDict_plot[i][2],
-                           wave    = bundleDict[i][2])
-        rpaths = os.seqtrace(bundle, sysseq)
-        for j in rpaths: 
-            j.draw2d(ax, color, pn, up)
+    # Get dimensions and initialise r2
+    m = len(initialbundle)
+    n = len(initialbundle[0])
+    r2 = [0 for x in range(m*n)]
 
-    os.draw2d(ax, color="grey", vertices=50, plane_normal=pn, up=up)  
+    # Calculate rays
+    counter = 0
+    for i in range(0,m):
+        for j in range(0,n):
+            r2 = s.seqtrace(initialbundle[i][j], sysseq)
+            for r in r2:
+                r.draw2d(ax, color="green", plane_normal=pn, up=up)
 
-
+    s.draw2d(ax, color="grey", vertices=50, plane_normal=pn, up=up) 

@@ -50,6 +50,9 @@ from auxiliary_functions import calculateRayPaths,\
                                 calcBundleProps,\
                                 plotBundles,\
                                 inout 
+#meritfunction and initialbundle
+from aux_merit_bundle import buildInitialbundle, get_bundle_merit
+
 #######################################NeuAnfang##################################
 #create inout object for all io stuff
 fi1=inout()
@@ -79,12 +82,12 @@ s.addElement(elem1.name, elem1)
 SurfNamesList=fi1.get_SurfNameList()
 print(SurfNamesList)
 
-Elem1List = (elem1.name, [ (SurfNamesList[0]   , {"is_stop": True}),
+Elem1List = (elem1.name, [ (SurfNamesList[2]   , {"is_stop": True}),
                            (SurfNamesList[1]   , {}),
-                           (SurfNamesList[2]   , {}),
                            (SurfNamesList[3]   , {}),
                            (SurfNamesList[4]   , {}),
-                           (SurfNamesList[5]   , {})] )
+                           (SurfNamesList[5]   , {}),
+                           (SurfNamesList[0]   , {})] )
 
 
 # --- 2. elem
@@ -117,6 +120,20 @@ default is 0.0
 
 '''
 
+# ----- define raybundles
+# every parameter needs to be an array/list! e.g. [7] instead of 7
+rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
+	         "anglex": [0.03], "raster":raster.RectGrid()}
+#rastertype = raster.RectGrid()
+#define wavelengths
+wavelength = [0.5875618e-3]#, 0.4861327e-3]#, 0.6562725e-3]
+numrays = 100
+
+(initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
+                                    numrays, wavelength)
+
+
+'''
 # ----- 1. raybundle
 numrays1    = 200
 rays_dict1  = {"startz": -7,
@@ -148,22 +165,20 @@ bundleDict[1] = (numrays2, rays_dict2, wavelength2, bundletype2)
 # ----- automatically calculate bundle properties for meritfunction/plot
 bundlePropDict, bundlePropDict_plot = calcBundleProps(osa, bundleDict, 
                                                       numrays_plot=100)
-
+'''
 # ----- plot the original system
 # --- set the plot setting
 pn = np.array([1, 0, 0])
 up = np.array([0, 1, 0])
 
 fig = plt.figure(1)
-ax1 = fig.add_subplot(311)
-ax2 = fig.add_subplot(312)
+ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
 ax1.axis('equal')
 ax2.axis('equal')
 
 # --- plot the bundles and draw the original system
-#print("hier5")
-#print(s.elements)
-plotBundles(s, bundleDict, bundlePropDict_plot, sysseq, ax1, pn, up)
+plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 
 
@@ -184,16 +199,16 @@ def osupdate(my_s):
     my_s.rootcoordinatesystem.update()
 
 # --- define meritfunction
-def meritfunctionrms(my_s):
-    x, y = calculateRayPaths(my_s, bundleDict, bundlePropDict, sysseq)
-    xmean = np.mean(x)
-    ymean = np.mean(y)
+#def meritfunctionrms(my_s):
+#    x, y = calculateRayPaths(my_s, bundleDict, bundlePropDict, sysseq)
+#    xmean = np.mean(x)
+#    ymean = np.mean(y)
 
     # choose the error function defined in auxiliary_functions
-    res = error2squared(x, xmean, y, ymean, penalty=True)
+#    res = error2squared(x, xmean, y, ymean, penalty=True)
     #res = error1(x, xmean, y, ymean, penalty=True)
 
-    return res
+#    return res
 
 
 # ----- choose the backend
@@ -225,13 +240,16 @@ s = optimi.run()
 ## V----------- plot the optimized system
 #
 ## --- plot the bundles and draw the system
-plotBundles(s, bundleDict, bundlePropDict_plot, sysseq, ax2, pn, up)
+#TODO wenn fogende zeiel auskommentiert wird dauert das plotten ewig, obwhl die 
+#funktion bereits vorher aufgerufen wurde und (relativ) schnell geht????????
+#plotBundles(s, initialbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
-numrays_spot = 200
-for i in bundleDict:
-    osa.aim(numrays_spot, bundleDict[i][1], wave=bundleDict[i][2])
-    osa.drawSpotDiagram()
+
+#numrays_spot = 200
+#for i in bundleDict:
+#    osa.aim(numrays_spot, bundleDict[i][1], wave=bundleDict[i][2])
+#    osa.drawSpotDiagram()
 
 
 # get a look at the vars
