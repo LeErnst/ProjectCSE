@@ -1,3 +1,5 @@
+# ignore all files with the following suffixes, if you want to ignore more files
+# look at the git_commands.txt file
 *.csv
 *.pdf
 *.swp
