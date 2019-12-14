@@ -9,6 +9,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
+# --- copy function for copying the initialbundle
+from copy import deepcopy
+
 # --- optical system and raytracing
 from pyrateoptics.raytracer.optical_system              import OpticalSystem
 from pyrateoptics.raytracer.optical_element             import OpticalElement
@@ -49,7 +52,11 @@ from auxiliary_functions import calculateRayPaths,\
                                 setOptimizableVariables,\
                                 calcBundleProps,\
                                 plotBundles,\
-                                inout 
+                                inout,\
+                                plotSpotDia
+#meritfunction and initialbundle
+from aux_merit_bundle import buildInitialbundle, get_bundle_merit
+
 #######################################NeuAnfang##################################
 #create inout object for all io stuff
 fi1=inout()
@@ -57,7 +64,7 @@ fi1=inout()
 #create optical system
 s = OpticalSystem.p()
 
-#create for each surface a coordinate system
+#create for each surface a coordinate system which includes loading the surfaces
 cs=fi1.create_coordinate_systems(s)
 
 #create optical element
@@ -76,22 +83,8 @@ s.addElement(elem1.name, elem1)
 
 # II---------------------- optical system analysis
 # --- 1. elem
-SurfNamesList = list(s.elements[elem1.name].surfaces.keys())
 
-Elem1List = (elem1.name, [ (SurfNamesList[0]   , {"is_stop": True}),
-                           (SurfNamesList[1]   , {}),
-                           (SurfNamesList[2]   , {}),
-                           (SurfNamesList[3]   , {}),
-                           (SurfNamesList[4]   , {}),
-                           (SurfNamesList[5]   , {})] )
-
-# --- 2. elem
-# ...no second OptElem
-
-# ----------- define element sequence
-sysseq = [Elem1List]
-#print("sysseq")
-#print(sysseq)
+sysseq=fi1.get_sysseq(elem1);
 
 # ----------- define optical system analysis object
 osa = OpticalSystemAnalysis(s, sysseq)
@@ -115,6 +108,22 @@ default is 0.0
 
 '''
 
+# ----- define raybundles
+# every parameter needs to be an array/list! e.g. [7] instead of 7
+rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
+	         "anglex": [0.03, -0.05], "raster":raster.RectGrid()}
+#rastertype = raster.RectGrid()
+#define wavelengths
+wavelength = [0.5875618e-3]#, 0.4861327e-3]#, 0.6562725e-3]
+numrays = 10
+wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
+numrays = 50
+
+(initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
+                                    numrays, wavelength)
+
+
+'''
 # ----- 1. raybundle
 numrays1    = 200
 rays_dict1  = {"startz": -7,
@@ -146,52 +155,30 @@ bundleDict[1] = (numrays2, rays_dict2, wavelength2, bundletype2)
 # ----- automatically calculate bundle properties for meritfunction/plot
 bundlePropDict, bundlePropDict_plot = calcBundleProps(osa, bundleDict, 
                                                       numrays_plot=100)
-
+'''
 # ----- plot the original system
 # --- set the plot setting
 pn = np.array([1, 0, 0])
 up = np.array([0, 1, 0])
 
 fig = plt.figure(1)
-ax1 = fig.add_subplot(311)
-ax2 = fig.add_subplot(312)
+ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
 ax1.axis('equal')
 ax2.axis('equal')
 
 # --- plot the bundles and draw the original system
-#print("hier5")
-#print(s.elements)
-plotBundles(s, bundleDict, bundlePropDict_plot, sysseq, ax1, pn, up)
-
+# first it is necessary to copy the initialbundle, as it's gonna be changed
+# inside of the seqtrace function (called inside of plotBundles)
+testbundle = deepcopy(initialbundle)
+plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 
 # IV ----------- optimization
 # ----- define optimizable variables
-'''
-all optimizable variables: ["decz", "decx", "decy", "tiltx", "tilty", "tiltz",
-                            "curvature", "cc"]
-'''
-
 #######################################NeuAnfang##################################
 fi1.setup_variables(s,elem1.name)
 #######################################NeuEnde##################################
-
-##################die zeile oben ersetzt das unten auskommentierte
-#optiVarsDict = {}
-## watch out: 0 is the aperture
-##            1 is the first surface and so on
-#
-## --- 1. Surface
-#optiVarsDict[SurfNamesList[1]] = {"curvature": [-0.35, 0.35],
-#                                  "decz"     : [ 1.0 , 3.9  ]}
-## --- 3. Surface
-#optiVarsDict[SurfNamesList[3]] = {"curvature": [-0.35, 0.35  ],
-#                                  "decz"     : [ 5.5 , 8.    ],
-#                                  "decx"     : [-0.5 , 0.5  ]}
-#
-#
-## --- call auxiliary function to set optimizable variables
-#setOptimizableVariables(s, elem1.name, optiVarsDict, SurfNamesList) 
 
 # --- print table of optimizable variables
 # this is actually quite nice to get a look at the vars, especially at the end
@@ -204,16 +191,16 @@ def osupdate(my_s):
     my_s.rootcoordinatesystem.update()
 
 # --- define meritfunction
-def meritfunctionrms(my_s):
-    x, y = calculateRayPaths(my_s, bundleDict, bundlePropDict, sysseq)
-    xmean = np.mean(x)
-    ymean = np.mean(y)
+#def meritfunctionrms(my_s):
+#    x, y = calculateRayPaths(my_s, bundleDict, bundlePropDict, sysseq)
+#    xmean = np.mean(x)
+#    ymean = np.mean(y)
 
     # choose the error function defined in auxiliary_functions
-    res = error2squared(x, xmean, y, ymean, penalty=True)
+#    res = error2squared(x, xmean, y, ymean, penalty=True)
     #res = error1(x, xmean, y, ymean, penalty=True)
 
-    return res
+#    return res
 
 
 # ----- choose the backend
@@ -245,17 +232,13 @@ s = optimi.run()
 ## V----------- plot the optimized system
 #
 ## --- plot the bundles and draw the system
-plotBundles(s, bundleDict, bundlePropDict_plot, sysseq, ax2, pn, up)
+plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
-numrays_spot = 200
-for i in bundleDict:
-    osa.aim(numrays_spot, bundleDict[i][1], wave=bundleDict[i][2])
-    osa.drawSpotDiagram()
+plotSpotDia(osa, numrays, rays_dict, wavelength)
 
 
 # get a look at the vars
 ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 
 plt.show()
-

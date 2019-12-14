@@ -64,6 +64,8 @@ class inout:
         self.NamesOptVariable=["decxvar","decyvar","deczvar","tiltxvar",\
                 "tiltyvar","tiltzvar","ccvar","curvaturevar"]
 
+
+
     def set_add(self):
         self.mode=0
 
@@ -268,6 +270,17 @@ class inout:
                                     [params[:-3]][0], \
                                     right=optiVarsDict[surfnames][params[:-3]][1])
     
+    def get_sysseq(self, elem1):
+        templist=[]
+        for i in range(len(self.SurfNameList)):
+            if self.get_val("isstop",i):
+                templist.append((self.get_val("name",i), {"is_stop":True}))
+            else:
+                templist.append((self.get_val("name",i), {}))
+            
+        sysseq=[(elem1.name,templist)]
+        return sysseq 
+    
 
 def str_to_class(classname):
     return getattr(sys.modules[__name__], classname)
@@ -377,10 +390,10 @@ def calculateRayPaths(os, bundleDict, bundlePropDict, sysseq):
     
     return x, y
 
-
-def plotBundles(os, bundleDict, bundlePropDict_plot, sysseq, 
-                ax, pn, up, color="blue"):
+def plotBundles(s, initialbundle, sysseq, 
+                ax, pn, up2, color="blue"):
     '''
+    EDITED BY LEANDRO 29.11.2019
     os: OpticalSystem-object optimization
     bundleDict: all bundle data in a dictionary
     bundlePropDict_plot: dictionary which contains all the bundle properties
@@ -391,15 +404,43 @@ def plotBundles(os, bundleDict, bundlePropDict_plot, sysseq,
     draws all rays in the bundleDict and the optical system os
     '''
 
-    for i in bundlePropDict_plot.keys():
-        bundle = RayBundle(x0      = bundlePropDict_plot[i][0], 
-                           k0      = bundlePropDict_plot[i][1],
-                           Efield0 = bundlePropDict_plot[i][2],
-                           wave    = bundleDict[i][2])
-        rpaths = os.seqtrace(bundle, sysseq)
-        for j in rpaths: 
-            j.draw2d(ax, color, pn, up)
+    # Get dimensions and initialise r2
+    m = len(initialbundle)
+    n = len(initialbundle[0])
+    r2 = [0 for x in range(m*n)]
 
-    os.draw2d(ax, color="grey", vertices=50, plane_normal=pn, up=up)  
+    # Calculate rays
+    counter = 0
+    for i in range(0,m):
+        for j in range(0,n):
+            r2 = s.seqtrace(initialbundle[i][j], sysseq)
+            for r in r2:
+                r.draw2d(ax, color="green", plane_normal=pn, up=up2)
 
+    s.draw2d(ax, color="grey", vertices=50, plane_normal=pn, up=up2) 
 
+def plotSpotDia(osa, numrays, rays_dict, wavelength):
+
+    #Set defaults for dictionary
+    rays_dict.setdefault("startx", [0])
+    rays_dict.setdefault("starty", [0])
+    rays_dict.setdefault("startz", [-7])
+    rays_dict.setdefault("angley", [0])
+    rays_dict.setdefault("anglex", [0])
+    rays_dict.setdefault("rasterobj", raster.RectGrid())
+    rays_dict.setdefault("radius", [15])
+
+    #Iterate over all entries
+    for i in rays_dict["startx"] :
+        for j in rays_dict["starty"] :
+            for k in rays_dict["startz"] :
+                for l in rays_dict["angley"] :
+                    for m in rays_dict["anglex"] :
+                        for n in rays_dict["radius"] :
+                            #Setup dict for current Bundle
+                            bundle_dict = {"startx":i, "starty":j, "startz":k,
+                                           "angley":l, "anglex":m, "radius":n,
+                                           "rasterobj":rays_dict["rasterobj"]}
+                            for o in wavelength :
+                                osa.aim(numrays, bundle_dict, wave=o)
+                                osa.drawSpotDiagram()
