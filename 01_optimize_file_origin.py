@@ -2,6 +2,9 @@
 # including the necessary classes, functions and libraries
 # by patrick, leandro, michael, lewin
 
+# This is the main file for changes regarding outsourcing, do not test your 
+# optimization functions within this file until our final main.py is made
+
 # --- general
 import logging
 import math
@@ -114,50 +117,16 @@ default is 0.0
 # every parameter needs to be an array/list! e.g. [7] instead of 7
 rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
 	         "anglex": [0.03, -0.05], "raster":raster.RectGrid()}
-#rastertype = raster.RectGrid()
-#define wavelengths
-wavelength = [0.5875618e-3]#, 0.4861327e-3]#, 0.6562725e-3]
-numrays = 10
+# rastertype = raster.RectGrid()
+# define wavelengths
 wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
-numrays = 50
+numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
-                                    numrays, wavelength)
+                                    numrays, wavelength, 
+                                    whichmeritfunc='standard_error2')
 
 
-'''
-# ----- 1. raybundle
-numrays1    = 200
-rays_dict1  = {"startz": -7,
-               "anglex": 0.052, 
-               "radius": 16., 
-               "raster": raster.RectGrid()}
-wavelength1 = 0.587e-3 # [mm]
-bundletype1 = "collimated_bundle"
-
-# do not forget the bundleDict entry, otherwise the bundle is not captured
-# the order does matter
-bundleDict[0] = (numrays1, rays_dict1, wavelength1, bundletype1)
-
-# ----- 2. raybundle
-
-numrays2    = 200
-rays_dict2  = {"startz": -7,
-               "radius": 16., 
-               "raster": raster.RectGrid()}
-wavelength2 = 0.587e-3 # [mm]
-bundletype2 = "collimated_bundle"
-
-bundleDict[1] = (numrays2, rays_dict2, wavelength2, bundletype2)
-
-# ----- 3. raybundle
-# and so on
-
-
-# ----- automatically calculate bundle properties for meritfunction/plot
-bundlePropDict, bundlePropDict_plot = calcBundleProps(osa, bundleDict, 
-                                                      numrays_plot=100)
-'''
 # ----- plot the original system
 # --- set the plot setting
 pn = np.array([1, 0, 0])
@@ -178,7 +147,7 @@ plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 # IV ----------- optimization
 # ----- define optimizable variables
-#######################################NeuAnfang##################################
+#######################################NeuAnfang################################
 fi1.setup_variables(s,elem1.name)
 #######################################NeuEnde##################################
 
@@ -191,19 +160,6 @@ listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 def osupdate(my_s):
 #   Update all coordinate systems during run
     my_s.rootcoordinatesystem.update()
-
-# --- define meritfunction
-#def meritfunctionrms(my_s):
-#    x, y = calculateRayPaths(my_s, bundleDict, bundlePropDict, sysseq)
-#    xmean = np.mean(x)
-#    ymean = np.mean(y)
-
-    # choose the error function defined in auxiliary_functions
-#    res = error2squared(x, xmean, y, ymean, penalty=True)
-    #res = error1(x, xmean, y, ymean, penalty=True)
-
-#    return res
-
 
 # ----- choose the backend
 opt_backend = ScipyBackend(method='Nelder-Mead',                                 

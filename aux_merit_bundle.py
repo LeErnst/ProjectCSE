@@ -77,7 +77,8 @@ def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10, wavelength=[0.587e
                             counteri = counteri + 1
     return initialbundle
 
-def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10, wavelength=[0.587e-3]):
+def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
+                     wavelength=[0.587e-3], whichmeritfunc='standard_error2'):
     """
     initializes the initialBundles and forms the meritfunction
     this is necessary as the meritfunction needs the initalbundle, but in the 
@@ -85,13 +86,18 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10, wavelength=[0.587e-3
     meritfunction needs to be wrapped inside the bundle initialisation
     """
 
-    initialbundle = buildInitialbundle(osa, s, sysseq, rays_dict, numrays, wavelength)
-    # --- define meritfunctioni
-    def meritfunctionrms(my_s):
+    initialbundle = buildInitialbundle(osa, s, sysseq, rays_dict, 
+                                       numrays, wavelength)
+    
+    # --- define meritfunctions:
+    # You can add your meritfunctionsrms-implementation and then add it to 
+    # the dictionary. If the string whichmeritfunc is not a key in the dict. the 
+    # standard_error2 function is taken. (exception handling)
+    # This is a necessary generalization, because for instance the sgd needs 
+    # a special meritfunc.
+    def meritfunctionrms_standard(my_s):
         """
-        Merit function for tracing a raybundle through system and calculate
-        rms spot radius without centroid subtraction. Punish low number of
-        rays, too.
+        Standard meritfunctionrms: 
         """
         res = 0
 
@@ -104,7 +110,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10, wavelength=[0.587e-3
                 my_initialbundle = initialbundle[i][j]
                 rpaths = my_s.seqtrace(my_initialbundle, sysseq)
 
-                # put x and y value for ALL wavelengths in x and y array to caculate mean
+                # put x and y value for ALL wavelengths in x and y array 
+                # to caculate mean
                 x.append(rpaths[0].raybundles[-1].x[-1, 0, :])
                 y.append(rpaths[0].raybundles[-1].x[-1, 1, :])
 
@@ -112,10 +119,24 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10, wavelength=[0.587e-3
             xmean = np.mean(x)
             ymean = np.mean(y)
 
-        # Choose error function
-        res += error2squared(x, xmean, y, ymean)
-        # res += error1(x, x_ref, y, y_ref)
-        # res = res + np.sum((x - xmean)**2 + (y - ymean)**2) + 10.*math.exp(-len(x))
+            # Choose error function
+            if (whichmeritfunc == 'standard_error2'):
+                res += error2squared(x, xmean, y, ymean)
+            elif (whichmeritfunc == 'standard_error1'):
+                res += error1(x, xmean, y, ymean)
+
         return res
-    
-    return (initialbundle, meritfunctionrms)
+
+    def meritfunctionrms_sgd(my_s):
+        res = 0
+        # not implemented yet
+        return res
+
+    # for defining which meritfunction should be used
+    switcher = {'standard_error1': meritfunctionrms_standard,
+                'standard_error2': meritfunctionrms_standard,
+                'sgd'            : meritfunctionrms_sgd      }
+
+    return (initialbundle, switcher.get(whichmeritfunc, \
+                                        meritfunctionrms_standard))
+

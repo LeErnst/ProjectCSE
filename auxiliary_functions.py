@@ -303,10 +303,10 @@ def error1(x, x_ref, y, y_ref, penalty=False):
     L1-error = sum_{i=1 to #rays}(||(x_i, y_i)^T - (x_ref, y_ref)^T||_1)
     '''
     if penalty:
-        res = np.sum(np.maximum(np.absolute(x-x_ref),np.absolute(y-y_ref)))+\
-              10.*math.exp(-len(x))
+        res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))\
+              + 10.*math.exp(-len(x))
     else:
-        res = np.sum(np.maximum(np.absolute(x-x_ref),np.absolute(y-y_ref)))
+        res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))
 
     return res
 

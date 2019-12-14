@@ -75,9 +75,9 @@ MM: staged und modified
 Dateien ignorieren (z.B. automatisch generierte Dateien):
 Dazu wird eine .gitignore Datei erstellt mit dem Inhalt (Beispiel):
 # ignore all .a and .o files
-.[oa]
+*.[oa]
 # ingnore all .log files
-.log
+*.log
 # wird ignoriert
  wird ebenfalls ignoriert, (Leerzeichen am Anfang)
 # do track lib.a, even though you're ignoring .a files above
@@ -219,9 +219,12 @@ Anzeigen der tags
 git show
 
 
+passwort und username nur einmal eingeben:
+den nachfolgenden befehl eingeben, bei der nächsten eingabe eures passworts und 
+username wird der lokal bei euch abgelegt (unverschlüsselt und nur geschützt durch
+system permissions)
 
-
-
+git config --global credential.helper store
 
 
 

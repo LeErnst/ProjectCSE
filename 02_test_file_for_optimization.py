@@ -122,11 +122,12 @@ default is 0.0
 rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
 	         "anglex": [0.03, -0.05], "raster":raster.RectGrid()}
 # define wavelengths
-wavelength = [0.5875618e-3]#, 0.4861327e-3, 0.6562725e-3]
-numrays = 20
+wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
+numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
-                                    numrays, wavelength)
+                                    numrays, wavelength, 
+                                    whichmeritfunc='standard_error2')
 
 
 # ----- plot the original system
