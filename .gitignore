@@ -1,4 +1,4 @@
-.csv
-.pdf
-.swp
-.pyc
+*.csv
+*.pdf
+*.swp
+*.pyc
