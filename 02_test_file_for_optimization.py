@@ -1,6 +1,14 @@
 # template to create a optical system which is optimized
 # including the necessary classes, functions and libraries
-# by lewin
+# by patrick, leandro, michael, lewin
+
+
+# lewin has created this file for testing some algorithms and to not change the 
+# original file (01_..), which is the main file for patricks changes (outsourcing
+# some functions and so on). i will use this file only for testing until the 
+# main.py script is made and i will not change any functions or classes which
+# have patrick/leandro created
+
 
 # --- general
 import logging
@@ -38,10 +46,11 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      Newton1DBackend,
                                                      ParticleSwarmBackend,
                                                      SimulatedAnnealingBackend)
+from project_optimize_backends import (ProjectScipyBackend,
+                                       test_minimize_neldermead)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
-#logging.basicConfig(level=logging.DEBUG)
 #logging.basicConfig(level=logging.DEBUG)
 #logging.basicConfig()
 
@@ -112,50 +121,14 @@ default is 0.0
 # every parameter needs to be an array/list! e.g. [7] instead of 7
 rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
 	         "anglex": [0.03, -0.05], "raster":raster.RectGrid()}
-#rastertype = raster.RectGrid()
-#define wavelengths
-wavelength = [0.5875618e-3]#, 0.4861327e-3]#, 0.6562725e-3]
-numrays = 10
-wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
-numrays = 50
+# define wavelengths
+wavelength = [0.5875618e-3]#, 0.4861327e-3, 0.6562725e-3]
+numrays = 20
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength)
 
 
-'''
-# ----- 1. raybundle
-numrays1    = 200
-rays_dict1  = {"startz": -7,
-               "anglex": 0.052, 
-               "radius": 16., 
-               "raster": raster.RectGrid()}
-wavelength1 = 0.587e-3 # [mm]
-bundletype1 = "collimated_bundle"
-
-# do not forget the bundleDict entry, otherwise the bundle is not captured
-# the order does matter
-bundleDict[0] = (numrays1, rays_dict1, wavelength1, bundletype1)
-
-# ----- 2. raybundle
-
-numrays2    = 200
-rays_dict2  = {"startz": -7,
-               "radius": 16., 
-               "raster": raster.RectGrid()}
-wavelength2 = 0.587e-3 # [mm]
-bundletype2 = "collimated_bundle"
-
-bundleDict[1] = (numrays2, rays_dict2, wavelength2, bundletype2)
-
-# ----- 3. raybundle
-# and so on
-
-
-# ----- automatically calculate bundle properties for meritfunction/plot
-bundlePropDict, bundlePropDict_plot = calcBundleProps(osa, bundleDict, 
-                                                      numrays_plot=100)
-'''
 # ----- plot the original system
 # --- set the plot setting
 pn = np.array([1, 0, 0])
@@ -176,7 +149,7 @@ plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 # IV ----------- optimization
 # ----- define optimizable variables
-#######################################NeuAnfang##################################
+#######################################NeuAnfang################################
 fi1.setup_variables(s,elem1.name)
 #######################################NeuEnde##################################
 
@@ -190,22 +163,16 @@ def osupdate(my_s):
 #   Update all coordinate systems during run
     my_s.rootcoordinatesystem.update()
 
-# --- define meritfunction
-#def meritfunctionrms(my_s):
-#    x, y = calculateRayPaths(my_s, bundleDict, bundlePropDict, sysseq)
-#    xmean = np.mean(x)
-#    ymean = np.mean(y)
-
-    # choose the error function defined in auxiliary_functions
-#    res = error2squared(x, xmean, y, ymean, penalty=True)
-    #res = error1(x, xmean, y, ymean, penalty=True)
-
-#    return res
-
 
 # ----- choose the backend
-opt_backend = ScipyBackend(method='Nelder-Mead',                                 
-                           options={'maxiter': 1000, 'disp': True}, tol=1e-8)
+
+# opt_backend = ScipyBackend(method='Nelder-Mead',
+#                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
+
+# choose our own backend for testing some algos
+opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,\
+                                  options={'maxiter': 1000, 'xatol': 1e-5,\
+                                           'fatol': 1e-5})
 
 # ----- create optimizer object
 optimi = Optimizer(s,
@@ -222,10 +189,13 @@ fi1.write_to_file() #am ende einmal in ne datei schreiben
 ################################################
 
 ## ----- debugging
-##optimi.logger.setLevel(logging.DEBUG)
+#optimi.logger.setLevel(logging.DEBUG)
 #
 ## ----- start optimizing
 s = optimi.run()
+# print the final simplex, which are the meritfunction values
+print("f simplex: ", opt_backend.res.final_simplex[1])
+print("iterNum = ", opt_backend.res.nit)
 #
 #
 #
@@ -235,7 +205,7 @@ s = optimi.run()
 plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ##
 # --- draw spot diagrams
-plotSpotDia(osa, numrays, rays_dict, wavelength)
+# plotSpotDia(osa, numrays, rays_dict, wavelength)
 
 
 # get a look at the vars

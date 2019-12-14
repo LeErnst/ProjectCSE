@@ -3,7 +3,7 @@ import random
 import numpy
 from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
-from ..core.log import BaseLogger
+from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
 
 class ProjectScipyBackend(Backend):
@@ -15,6 +15,7 @@ class ProjectScipyBackend(Backend):
     def run(self, x0):
         res = minimize(self.func, x0=x0, args=(), method=self.optimize_func,
                        options=self.options, **self.kwargs)
+        self.res = res
         return res.x
 
 # from:
