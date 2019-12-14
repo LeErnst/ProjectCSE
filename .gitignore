@@ -1,6 +1,30 @@
-# ignore all .csv files
-.csv
-# ignore all .pyc files
-.pyc
-# ignore all .swp files
-.swp
+*.bak
+*.pyc
+*.aux
+*.bib
+*.pdf
+*.toc
+*.backup
+*.orig
+*.log
+*.out
+*.bbl
+*.synctex.gz
+*.blg
+result_images/
+.hypothesis/
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+lib
+lib64
