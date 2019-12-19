@@ -55,16 +55,31 @@ class inout:
         self.longnames_fix=[]
         self.shortnames_var=[]
         self.shortnames_fix=[]
+        #Take care if you change the input_surface file. The order below
+        #hast to represent the order of the input_surface file
+        self.surface_order=["name", "decx", "decxvar", "decy", \
+                "decyvar", "decz", "deczvar", "tiltx", "tiltxvar",\
+                "tilty", "tiltyvar", "tiltz", "tiltzvar", "maxrad",\
+                "maxradvar","minrad", "minradvar", "conic", "conicvar",\
+                "curvature", "curvaturevar", "conn1", "conn2", \
+                "isstop","shape","aperture"]
+        #the name of the stateattribute of the variables. Take care! They
+        #have to end like "variablename"var with a var at the end
+        self.NamesOptVariable=["decxvar","decyvar","deczvar","tiltxvar",\
+                "tiltyvar","tiltzvar","conicvar","curvaturevar"]
+        #Take care if you change the bundle_input file. The order below
+        #hast to represent the order of the bundle_input file
+        self.ray_order=["startx","starty","startz",\
+                "radius","anglex","angley",\
+                "numrays","wavelength","raster"]
         self.surfaces=np.genfromtxt(self.globpath+"surface_input",dtype=None,\
                 comments="#")
+        self.rays=np.genfromtxt(self.globpath+"bundle_input",dtype=None,\
+                comments="#").tolist()
         self.material=[]
         self.SurfNameList=[]
         #take care: it is necessaray that here stands the "normal" variable name 
         #added with an var. all possible varialbe items have to mentioned below 
-        self.NamesOptVariable=["decxvar","decyvar","deczvar","tiltxvar",\
-                "tiltyvar","tiltzvar","ccvar","curvaturevar"]
-
-
 
     def set_add(self):
         self.mode=0
@@ -160,35 +175,33 @@ class inout:
                         self.search_result_fix[str(key)].append(obj.evaluate())
         if(self.mode==1):
             self.set_add()
-
+        
         self.iteration+=1
+        #print(self.search_result_fix)
+        #print(self.search_result_var)
 
         #if the residuum or merritfunction value is needed it can be added here in the code 
     
-    #function below represents the structure of the surface_input file. You have to change the indizes just here
-    #if you change the structure of the input file
-    def get_val(self, name, index):
-        return self.surfaces[index][{"name":0, "decx":1, "decxvar":2, "decy":3, \
-                "decyvar":4, "decz":5, "deczvar":6, "tiltx":7, "tiltxvar":8,\
-                "tilty":9, "tiltyvar":10, "tiltz":11, "tiltzvar":12, "maxrad":13,\
-                "maxradvar":14,"minrad":15, "minradvar":16, "cc":17, "ccvar":18,\
-                "curvature":19, "curvaturevar":20, "conn1":21, "conn2":22, \
-                "isstop":23,"shape":24,"aperture":25}[name]]
+    def get_sufval(self, name, index):
+        return self.surfaces[index][self.surface_order.index(name)]
+
+    def get_rayval(self,name):
+        return self.rays[self.ray_order.index(name)]
 
     #this function creates for every surface (defined in the surface_input file) one coordinate system, and returns a list of them
     def create_coordinate_systems(self,optical_system):
         coordinate_systems=[]
-        for i in range(len(self.surfaces)):
+        for i in range(self.surfaces.shape[0]):
             if(i==0):
                 refname_=optical_system.rootcoordinatesystem.name
             else:
                 refname_=coordinate_systems[i-1].name
             coordinate_systems.append(optical_system.\
                     addLocalCoordinateSystem(LocalCoordinates.p(\
-                    name=self.get_val("name",i),\
-                    decx=self.get_val("decx",i), decy=self.get_val("decy",i), \
-                    decz=self.get_val("decz",i), tiltx=self.get_val("tiltx",i),\
-                    tilty=self.get_val("tilty",i), tiltz=self.get_val("tiltz",i)),\
+                    name=self.get_sufval("name",i),\
+                    decx=self.get_sufval("decx",i), decy=self.get_sufval("decy",i), \
+                    decz=self.get_sufval("decz",i), tiltx=self.get_sufval("tiltx",i),\
+                    tilty=self.get_sufval("tilty",i), tiltz=self.get_sufval("tiltz",i)),\
                     refname=refname_))
 
         return coordinate_systems
@@ -196,60 +209,77 @@ class inout:
     #this function creates the sufaces defined in surface_input file and returns a list of these surfaces 
     def create_surfaces(self, cs):  #cs=coordinate Systems
         surface_objects=[]
-        for i in range(len(self.surfaces)):
-            if(self.get_val("shape",i)=="Conic"):
-                shape_=Conic.p(cs[i],curv=float(self.get_val("curvature",i)))
-                #print(self.get_val("curvature",i))
+        for i in range(self.surfaces.shape[0]):
+            if(self.get_sufval("shape",i)=="Conic"):
+                #hier noch cc einfuegen
+                shape_=Conic.p(cs[i],cc=float(self.get_sufval("conic",i)),curv=float(self.get_sufval("curvature",i)))
+                #print(self.get_sufval("curvature",i))
             else:
                 shape_=None
-
-            if(self.get_val("aperture",i)=="Circular"):
-                aperture_=CircularAperture(cs[i],float(self.get_val("maxrad",i)))
-                #print(float(self.get_val("maxrad",i)).__class__.__name__)
+            if(self.get_sufval("aperture",i)=="Circular"):
+                aperture_=CircularAperture(cs[i],minradius=float(self.get_sufval("minrad",i)), maxradius=float(self.get_sufval("maxrad",i)))
+                #print(float(self.get_sufval("maxrad",i)).__class__.__name__)
             else:
                 aperture_=None
 
-            self.SurfNameList.append(self.get_val("name",i))
+            self.SurfNameList.append(self.get_sufval("name",i))
             surface_objects.append(Surface.p(cs[i], shape=shape_, aperture=aperture_))
 
         return surface_objects
 
+    #reads material from the input_surface file and creates the needed object
+    #take care! A database of all materials is necessary. 
+    #Store the database in refractiveindex.info-database. Different databases
+    #can be downloaded from github e.g.
+    #https://github.com/polyanskiy/refractiveindex.info-database
     def create_material(self, cs, elem1, surf):
-        for i in range(len(self.surfaces)):
-            tempmat1=self.get_val("conn1",i)
-            tempmat2=self.get_val("conn2",i)
-            if(self.material.count(tempmat1)==0 and tempmat1 != "None"):
-                self.material.append(tempmat1)
-            if(self.material.count(tempmat2)==0 and tempmat2 != "None"):
-                self.material.append(tempmat2)
-        
-        gcat = refractiveindex_dot_info_glasscatalog("../pyrateoptics/refractiveindex.info-database/database/")
-        for i in range(len(self.material)):
-            #absolutely no idea why there is a coordinate system necessary for creating a material. random choice: use always cs[0].
-            #result is always the same, no matter which coordinate system is used
-            tempmat=gcat.createGlassObjectFromLongName(cs[0],self.material[i])
-            elem1.addMaterial(self.material[i],tempmat)
-         
-        for i in range(len(self.surfaces)):
-            elem1.addSurface(self.get_val("name",i),surf[i], \
-                    (self.get_val("conn1",i),self.get_val("conn2",i)))
+        if os.path.isdir("../pyrateoptics/refractiveindex.info-database/database/"):
+            for i in range(self.surfaces.shape[0]):
+                tempmat1=self.get_sufval("conn1",i)
+                tempmat2=self.get_sufval("conn2",i)
+                if(self.material.count(tempmat1)==0 and tempmat1 != "None"):
+                    self.material.append(tempmat1)
+                if(self.material.count(tempmat2)==0 and tempmat2 != "None"):
+                    self.material.append(tempmat2)
+            
+            gcat = refractiveindex_dot_info_glasscatalog("../pyrateoptics/refractiveindex.info-database/database/")
+            for i in range(len(self.material)):
+                #absolutely no idea why there is a coordinate system necessary for creating a material. random choice: use always cs[0].
+                #result is always the same, no matter which coordinate system is used
+                tempmat=gcat.createGlassObjectFromLongName(cs[0],self.material[i])
+                elem1.addMaterial(self.material[i],tempmat)
+             
+            for i in range(self.surfaces.shape[0]):
+                elem1.addSurface(self.get_sufval("name",i),surf[i], \
+                        (self.get_sufval("conn1",i),self.get_sufval("conn2",i)))
+        else:
+            print("It looks like there is no database at refractiveindex.info-database")
+            print("Please download a database e.g. from https://github.com/polyanskiy/refractiveindex.info-database")
 
+    #"value1&value2&value3" -> [value1,value2,value3] all values get a float 
+    #cast. If the cast is not possible the input string is returned 
     def convert_2_list(self,string):
-        liste=list(string.split("&"))                                                    
-        newlist=[]
-        for i in range(len(liste)):
-            newlist.append(float(liste[i]))
-        return newlist
+        try:
+            liste=list(string.split("&"))                                                    
+            newlist=[]
+            for i in range(len(liste)):
+                newlist.append(float(liste[i]))
+            return newlist
+        except:
+            return string
 
+    #creates optimizable variables with fixed or variable state
+    #if in the surface_input file are intervals defined, the variables
+    #get modified in the determined way
     def setup_variables(self, os, elemName):
         optiVarsDict = {}                                                                
         for i in range(len(self.SurfNameList)):
             temptdict={}
             for item in self.NamesOptVariable:
-                if self.get_val(item,i)!="f":
-                    temptdict[item[:-3]]=self.convert_2_list(self.get_val(item,i))
+                if self.get_sufval(item,i)!="f":
+                    temptdict[item[:-3]]=self.convert_2_list(self.get_sufval(item,i))
             
-            if(len(temptdict)!=0): optiVarsDict[self.get_val("name",i)]=temptdict
+            if(len(temptdict)!=0): optiVarsDict[self.get_sufval("name",i)]=temptdict
 
 
         for surfnames in optiVarsDict.keys():
@@ -261,29 +291,50 @@ class inout:
                     decOrTilt.setInterval(left=optiVarsDict[surfnames][params[:-3]][0],
                             right=optiVarsDict[surfnames][params[:-3]][1])
 
-                    for params in self.NamesOptVariable[-2:]:
-                        if params[:-3] in optiVarsDict[surfnames]:
-                            curvOrCc = getattr(os.elements[elemName].\
-                                    surfaces[surfnames].shape, params[:-3])
-                            curvOrCc.toVariable()
-                            curvOrCc.setInterval(left=optiVarsDict[surfnames]\
-                                    [params[:-3]][0], \
-                                    right=optiVarsDict[surfnames][params[:-3]][1])
-    
+            for params in self.NamesOptVariable[-2:]:
+                if params[:-3] in optiVarsDict[surfnames]:
+                    curvOrCc = getattr(os.elements[elemName].\
+                            surfaces[surfnames].shape, params[:-3])
+                    curvOrCc.toVariable()
+                    curvOrCc.setInterval(left=optiVarsDict[surfnames]\
+                            [params[:-3]][0], \
+                            right=optiVarsDict[surfnames][params[:-3]][1])
+
+    #returns a sequence of surfaces which are defined in the surface_input file 
     def get_sysseq(self, elem1):
         templist=[]
         for i in range(len(self.SurfNameList)):
-            if self.get_val("isstop",i):
-                templist.append((self.get_val("name",i), {"is_stop":True}))
+            if self.get_sufval("isstop",i):
+                templist.append((self.get_sufval("name",i), {"is_stop":True}))
             else:
-                templist.append((self.get_val("name",i), {}))
+                templist.append((self.get_sufval("name",i), {}))
             
         sysseq=[(elem1.name,templist)]
         return sysseq 
-    
+
+    #returns the dictionary which represents the ray bundles 
+    def get_rays_dict(self):
+        rays_dict={}
+        for i in range(len(self.ray_order)):
+            value=self.get_rayval(self.ray_order[i])
+            name=self.ray_order[i]
+            if isinstance(value,int):
+                rays_dict[name]=[value]
+            elif name=="raster":
+                if(value=="RectGrid"):
+                    rays_dict[name]=raster.RectGrid()
+            else:    
+                rays_dict[self.ray_order[i]]=self.convert_2_list(value)
+        return rays_dict 
 
 def str_to_class(classname):
     return getattr(sys.modules[__name__], classname)
+
+
+
+
+
+
 
 def error2squared(x, x_ref, y, y_ref, penalty=False):
     '''

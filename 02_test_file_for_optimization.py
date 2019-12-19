@@ -111,26 +111,8 @@ osa = OpticalSystemAnalysis(s, sysseq)
 
 
 # III ----------- defining raybundles for optimization and plotting 
-bundleDict = {} 
-'''
-possible rays_dict keywords:
- -startx 
- -starty 
- -startz
- -rasterobj 
- -radius 
- -angley
- -anglex
-
-default is 0.0
-
-'''
-
-# ----- define raybundles
-# every parameter needs to be an array/list! e.g. [7] instead of 7
-rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
-	         "anglex": [0.03, -0.05], "rasterobj":raster.RectGrid()}
-# define wavelengths
+rays_dict=fi1.get_rays_dict()
+#TODO In Landos code noch wavelength and numrays einpflegen
 wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
 numrays = 10
 
