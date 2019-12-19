@@ -444,3 +444,60 @@ def plotSpotDia(osa, numrays, rays_dict, wavelength):
                             for o in wavelength :
                                 osa.aim(numrays, bundle_dict, wave=o)
                                 osa.drawSpotDiagram()
+
+
+def get_bdry(optimi) :
+    '''
+    Returns an array that has the boundaries of the optimizable
+    variable in it, meaning:
+    [lowerbound_x1 upperbound_x1 ... lowerbound_xn upperbound_xn]
+    '''
+    
+    n = len(optimi.collector.variables_list)
+    bdry = np.zeros(2*n)
+    cnt = 0
+    for i in optimi.collector.variables_list :
+        bdry[cnt] = i.interval_trafo_fo._FunctionObject__global_variables['left']
+        cnt = cnt + 1
+        bdry[cnt] = i.interval_trafo_fo._FunctionObject__global_variables['right']
+        cnt = cnt + 1
+
+    return bdry
+
+
+def eval_h(x, bdry) :
+    '''
+    returns vector with the values of h(x) according to
+    Nocedal p. 494, meaning evaluating the min(0,h(x_i))
+    respectively max(0,h(x_i)) (depending whether it is
+    upper/lower boundary
+    '''
+
+    x = np.asfarray(x).flatten()
+    h_x = np.zeros(len(bdry))
+    cnt = 0
+    for xi in x :
+        h_x[cnt] = np.maximum(0, bdry[cnt]-xi)  #lower bound
+        cnt = cnt + 1
+        h_x[cnt] = np.maximum(0, xi-bdry[cnt])  #upper bound
+        cnt = cnt + 1
+
+    return h_x
+
+
+def eval_c(x, bdry) :
+    '''
+    returns vector with the values of c(x), with c(x) being the function
+    c(x) >= 0
+    '''
+
+    x = np.asfarray(x).flatten()
+    c_x = np.zeros(len(bdry))
+    cnt = 0
+    for xi in x :
+        c_x[cnt] = xi - bdry[cnt] #lower bound
+        cnt = cnt + 1
+        c_x[cnt] = bdry[cnt] - xi  #upper bound
+        cnt = cnt + 1
+
+    return c_x

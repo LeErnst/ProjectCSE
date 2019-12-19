@@ -11,7 +11,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-
+import sys
 # --- copy function for copying the initialbundle
 from copy import deepcopy
 
@@ -156,6 +156,10 @@ fi1.setup_variables(s,elem1.name)
 print("listedervariablen")
 listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 
+
+#print(s.__dict__)
+
+
 # --- define update function
 def osupdate(my_s):
 #   Update all coordinate systems during run
@@ -170,6 +174,15 @@ optimi = Optimizer(s,
                    meritfunctionrms,
                    backend=opt_backend,
                    updatefunction=osupdate)
+
+
+print(optimi.collector.variables_list[0].__dict__)
+#print(optimi.collector.__dict__)
+#print(optimi.__dict__)
+
+# sys.exit()
+
+
 
 
 #########################so kann man werte speichern###################

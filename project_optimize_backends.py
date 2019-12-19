@@ -1,20 +1,156 @@
 import math
 import random
 import numpy
+import sys
 from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
 from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
+from derivatives import grad
+from auxiliary_functions import get_bdry, eval_h, eval_c
 
 class ProjectScipyBackend(Backend):
-    def __init__(self, optimize_func, options={}, **kwargs):
+    def __init__(self, optimize_func, methodparam=None, tau0=1,
+                 options={}, **kwargs):
         self.optimize_func = optimize_func
         self.options = options
+        self.methodparam = methodparam
         self.kwargs = kwargs
+        self.tau0   = tau0
+        # self.func=MeritFunctionWrapper is set within the Optimizer __init__ 
 
+    def update_PSB(self, optimi) :
+        '''
+        function gets the boundaries for the variables. THis is necessary if 
+        you want to run the optimization with penalty/lagrange terms. It is
+        important to call this function AFTER the Optimizer object was created
+        and BEFORE you run the optimization.
+        TODO: wie kann man das automatisieren?
+        '''
+
+        self.bdry = get_bdry(optimi)
+        print('self bdry in PSB:')
+        print(self.bdry)
+    
     def run(self, x0):
-        res = minimize(self.func, x0=x0, args=(), method=self.optimize_func,
-                       options=self.options, **self.kwargs)
+        # here we could implement the try/except construct to handle the case if 
+        # methodparam is None or no gradient is passed but is requiered by the 
+        # optimization method and so on
+        if (self.methodparam == 1):
+            #No Penalty, no Lagrange terms
+            res = minimize(self.func, 
+                           x0=x0, 
+                           args=(), 
+                           method=self.optimize_func,
+                           options=self.options, 
+                           **self.kwargs)
+        elif (self.methodparam == 2):
+            #Penalty term, but no Lagrange term
+
+            #################Iteration over different Tau's
+
+            normalt = numpy.linalg.norm(x0)
+            for i in range(4): #max amount of different tau's
+                print('x0 in run =')
+                print(x0)
+                res = minimize(lambda x: self.func(x) +
+                                        0.5*self.tau0*numpy.square(
+                                        numpy.linalg.norm(eval_h(x,self.bdry))), 
+                               x0=x0, 
+                               args=(), 
+                               method=self.optimize_func,
+                               options=self.options, 
+                               **self.kwargs)
+                x0 = res.x
+                #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
+                normneu = numpy.linalg.norm(x0)
+                print('normen')
+                print(normneu)
+                print(normalt)
+                print('meritwert')
+                print(self.func(x0))
+                if numpy.absolute(normneu-normalt)<0.01 :
+                    break
+
+                normalt = normneu       #update resalt
+                self.tau0 = 7*self.tau0 #update tau
+            ##############
+        
+        
+        elif (self.methodparam == 3):
+            #Both, Penalty and Lagrange Term
+            
+            
+            #################Iteration over different Tau's
+
+            normalt = numpy.linalg.norm(x0)
+            lam = numpy.ones(2*len(x0))
+            for i in range(4): #max amount of different tau's
+                print('x0 in run =')
+                print(x0)
+                res = minimize(lambda x: self.func(x) +
+                                        0.5*self.tau0*numpy.square(
+                                        numpy.linalg.norm(eval_h(x,self.bdry)))
+                                                       + 
+                                        numpy.dot(lam,eval_h(x,self.bdry)), 
+                               x0=x0, 
+                               args=(), 
+                               method=self.optimize_func,
+                               options=self.options, 
+                               **self.kwargs)
+                x0 = res.x
+                #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
+                normneu = numpy.linalg.norm(x0)
+                print('normen')
+                print(normneu)
+                print(normalt)
+                print('meritwert')
+                print(self.func(x0))
+                if numpy.absolute(normneu-normalt)<0.01 :
+                    break
+
+                normalt = normneu                               #update resalt
+                lam = numpy.add(lam, self.tau0*eval_h(x0, self.bdry))#update lam
+                self.tau0 = 7*self.tau0                         #update tau
+            ##############
+        
+        elif (self.methodparam == 4):
+            # Logarithmic Barrier Method
+            #MACHT DAS BEI UNS SINN???? ICH GLAUBE NICHT????????
+            #################Iteration over different my's
+            my = 1
+            normalt = numpy.linalg.norm(x0)
+            for i in range(4): #max amount of different my's
+                print('x0 in run =')
+                print(x0)
+                print('c_x in run')
+                print(eval_c(x0,self.bdry))
+                res = minimize(lambda x: self.func(x) - my*numpy.sum(
+                                                numpy.log(eval_c(x,self.bdry))),
+                               x0=x0, 
+                               args=(), 
+                               method=self.optimize_func,
+                               options=self.options, 
+                               **self.kwargs)
+                x0 = res.x
+                #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
+                normneu = numpy.linalg.norm(x0)
+                print('normen')
+                print(normneu)
+                print(normalt)
+                print('meritwert')
+                print(self.func(x0))
+                if numpy.absolute(normneu-normalt)<0.01 :
+                    break
+
+                normalt = normneu                  #update resalt
+                my = my/10                         #update my
+            ##############
+
+        else:
+            print("Something is gone wrong in the ProjectScipyBackend class!")
+            sys.exit()
+
         self.res = res
         return res.x
 
@@ -138,9 +274,9 @@ def _minimize_neldermead(func, x0, args=(), callback=None,
 """                                                                          
     
 
-def vanilla_sgd(func, x0, args=(), 
-                maxiter=250, disp=False, return_all=False, 
-                fatol=1e-4, stepsize=1e-3, **unknown_options):
+def sgd(func, x0, args, 
+        gradient=None, maxiter=250, fatol=1e-4,
+        stepsize=1e-3, h=1e-6, **unknown_options):
     """
     maxiter: int
         Maximum allowed number of iterations.
@@ -152,16 +288,43 @@ def vanilla_sgd(func, x0, args=(),
     stepsize: number
         Size of step between iterations.
     """
+    if (gradient == None):
+        print("stochastic_grad is None")
+        gradient = grad
+    else:
+        print("stochastic_grad is not None")
+    
+    print(x0)
+    termcond = grad
     xopt = x0
-    path = [x0]
-    iterNum = 0
-    iterTolf = fatol+1
+    xtemp = x0
+    # path = numpy.array([x0])
+    iterNum = 1
+    iterTolf = fatol + 1
+    # as a termination condition one could think of the real gradient and the
+    # hessian matrix
+    # another extension could be the escaping of a local minimum, like:
+    # 1. detect the lokal minimum with the gradient and the hessian
+    # 2. escape by making more steps with the stochastic gradient until another
+    #    local minimum is reached
+    tol = 1e-1
+    while ((iterNum < maxiter) and (tol < numpy.linalg.norm(termcond(func,xopt,h)))):# and (fatol < iterTolf)):
+        # iteration rule
+        xopt -= stepsize*gradient(func, xopt, h=1e-6) 
 
-    while ((iterNum >= maxIt) and (iterTolf >= fatol)):
-        xopt = xopt-eta*gradx
-        path.append(xopt)
+        # print(xopt)
+
+        # append the value to the path
+        # numpy.append(path, [xopt], axis=0)
+        # update the termination condition
+        print(iterNum)
         iterNum += 1
-        iterTolf = numpy.absolute(func(path[-1])-func(path[-2]))
+        # -----------------debugging
+        iterTolf = numpy.absolute(func(xopt)-func(xtemp))
+        # update xtemp
+        xtemp = xopt
+
+    return OptimizeResult(fun=func(xopt), x=xopt, nit=iterNum)
 
 
 def test_minimize_neldermead(func, x0, args=(), 

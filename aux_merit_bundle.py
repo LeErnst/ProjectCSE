@@ -4,6 +4,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import random
 
 # --- optical system and raytracing
 from pyrateoptics.raytracer.optical_system              import OpticalSystem
@@ -20,7 +21,8 @@ from pyrateoptics.raytracer.globalconstants             import canonical_ey
 from pyrateoptics.raytracer.globalconstants             import degree 
 
 # --- optical system analysis
-from pyrateoptics.raytracer.analysis.optical_system_analysis import OpticalSystemAnalysis
+from pyrateoptics.raytracer.analysis.optical_system_analysis import \
+                                                            OpticalSystemAnalysis
 from pyrateoptics.raytracer.analysis.surface_shape_analysis  import ShapeAnalysis
 # --- optimization
 from pyrateoptics.optimize.optimize          import Optimizer
@@ -33,7 +35,8 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
 from auxiliary_functions import error2squared, error1
 
 
-def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10, wavelength=[0.587e-3]):
+def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10, 
+                       wavelength=[0.587e-3]):
     '''
     Initialises the Initialbundles
     '''    
@@ -72,13 +75,15 @@ def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10, wavelength=[0.587e
                             for o in wavelength :
                                 (o1, k1, E1) = osa.collimated_bundle(numrays,
                                                             bundle_dict, wave=o)
-                                initialbundle[counteri][counterj] = RayBundle(x0=o1, k0=k1, Efield0=E1, wave=o)
+                                initialbundle[counteri][counterj] = \
+                                     RayBundle(x0=o1, k0=k1, Efield0=E1, wave=o)
                                 counterj = counterj + 1
                             counteri = counteri + 1
     return initialbundle
 
 def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
-                     wavelength=[0.587e-3], whichmeritfunc='standard_error2'):
+                     wavelength=[0.587e-3], whichmeritfunc='standard',
+                     error='error2', sample_param='wave'):
     """
     initializes the initialBundles and forms the meritfunction
     this is necessary as the meritfunction needs the initalbundle, but in the 
@@ -95,6 +100,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
     # standard_error2 function is taken. (exception handling)
     # This is a necessary generalization, because for instance the sgd needs 
     # a special meritfunc.
+
+    # ---------------standard meritfunction
     def meritfunctionrms_standard(my_s):
         """
         Standard meritfunctionrms: 
@@ -120,22 +127,61 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
             ymean = np.mean(y)
 
             # Choose error function
-            if (whichmeritfunc == 'standard_error2'):
+            if (error == 'error2'):
                 res += error2squared(x, xmean, y, ymean)
-            elif (whichmeritfunc == 'standard_error1'):
+            elif (error == 'error1'):
                 res += error1(x, xmean, y, ymean)
 
         return res
 
-    def meritfunctionrms_sgd(my_s):
-        res = 0
-        # not implemented yet
-        return res
+    # ---------------sgd meritfunction
+    wavel = len(wavelength)
+    def meritfunctionrms_sgd(my_s, **args):
+        if (len(args) == 0):
+#            sample_initialbundle = initialbundle
+#            print("args = 0 ")
+            return meritfunctionrms_standard(my_s)
+        else:
+            res = 0
+            sample_num = args["sample_num"]
+            print(sample_num)
+            # choose the sampled bundle
+            if (sample_param == 'bundle'):
+                sample_initialbundle = initialbundle[sample_num]
+                forrange = len(sample_initialbundle)
+            if (sample_param == 'wave'):
+                sample_initialbundle = initialbundle[sample_num//wavel]\
+                                                    [sample_num%wavel]
+                forrange = 1
+            if (sample_param == 'ray'):
+                pass #TODO: this seems to be a little bit tricky, but i expect a 
+                     #      bad solution anyway
+ 
+            # Loop over sample_initialbundle
+            for i in range(0, forrange):
+                x = []
+                y = []
+                rpaths = my_s.seqtrace(sample_initialbundle, sysseq)
+ 
+                # append x and y for each bundle
+                x.append(rpaths[0].raybundles[-1].x[-1, 0, :])
+                y.append(rpaths[0].raybundles[-1].x[-1, 1, :])
+ 
+                # Add up all the mean values of the different wavelengths
+                xmean = np.mean(x)
+                ymean = np.mean(y)
+ 
+                # Choose error function
+                if (error == 'error2'):
+                    res += error2squared(x, xmean, y, ymean)
+                elif (error == 'error1'):
+                    res += error1(x, xmean, y, ymean)
+ 
+            return res
 
     # for defining which meritfunction should be used
-    switcher = {'standard_error1': meritfunctionrms_standard,
-                'standard_error2': meritfunctionrms_standard,
-                'sgd'            : meritfunctionrms_sgd      }
+    switcher = {'standard': meritfunctionrms_standard,
+                'sgd'     : meritfunctionrms_sgd      }
 
     return (initialbundle, switcher.get(whichmeritfunc, \
                                         meritfunctionrms_standard))

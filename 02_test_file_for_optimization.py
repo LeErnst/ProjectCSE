@@ -16,6 +16,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import sys
 
 # --- copy function for copying the initialbundle
 from copy import deepcopy
@@ -47,12 +48,13 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      ParticleSwarmBackend,
                                                      SimulatedAnnealingBackend)
 from project_optimize_backends import (ProjectScipyBackend,
-                                       test_minimize_neldermead)
+                                       test_minimize_neldermead,
+                                       sgd)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
-#logging.basicConfig(level=logging.DEBUG)
-#logging.basicConfig()
+# logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig()
 
 # --- auxiliary functions
 from auxiliary_functions import calculateRayPaths,\
@@ -62,11 +64,18 @@ from auxiliary_functions import calculateRayPaths,\
                                 calcBundleProps,\
                                 plotBundles,\
                                 inout,\
-                                plotSpotDia
-#meritfunction and initialbundle
+                                plotSpotDia, \
+                                get_bdry
+# --- meritfunction and initialbundle
 from aux_merit_bundle import buildInitialbundle, get_bundle_merit
 
-#######################################NeuAnfang##################################
+# --- derivatives
+from derivatives import get_stochastic_grad
+
+
+
+
+#####################################NeuAnfang##################################
 #create inout object for all io stuff
 fi1=inout()
 
@@ -120,14 +129,15 @@ default is 0.0
 # ----- define raybundles
 # every parameter needs to be an array/list! e.g. [7] instead of 7
 rays_dict = {"startz":[-7], "starty": [0], "radius": [5],
-	         "anglex": [0.03, -0.05], "raster":raster.RectGrid()}
+	         "anglex": [0.03, -0.05], "rasterobj":raster.RectGrid()}
 # define wavelengths
 wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
 numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength, 
-                                    whichmeritfunc='standard_error2')
+                                    whichmeritfunc='sgd', 
+                                    error='error2')
 
 
 # ----- plot the original system
@@ -170,9 +180,15 @@ def osupdate(my_s):
 # opt_backend = ScipyBackend(method='Nelder-Mead',
 #                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
 
+
+
+#*******************************************************************************
+#****ALS FUNKTION AUSLAGERN???**************************************************
+#*******************************************************************************
 # choose our own backend for testing some algos
-opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,\
-                                  options={'maxiter': 1000, 'xatol': 1e-5,\
+opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,
+                                  methodparam=2,
+                                  options={'maxiter': 100, 'xatol': 1e-5,\
                                            'fatol': 1e-5})
 
 # ----- create optimizer object
@@ -181,22 +197,26 @@ optimi = Optimizer(s,
                    backend=opt_backend,
                    updatefunction=osupdate)
 
+#bdry = get_bdry(optimi)
 
-#########################so kann man werte speichern###################
+#Warum dreimal?!?
 fi1.store_data(s)   #bei jedem aufruf werden die variablen gespeichert
 fi1.store_data(s)
 fi1.store_data(s)
 fi1.write_to_file() #am ende einmal in ne datei schreiben
-################################################
 
-## ----- debugging
-#optimi.logger.setLevel(logging.DEBUG)
-#
 ## ----- start optimizing
+opt_backend.update_PSB(optimi)
 s = optimi.run()
+#*******************************************************************************
+#*******************************************************************************
+#*******************************************************************************
+
+
+
 # print the final simplex, which are the meritfunction values
-print("f simplex: ", opt_backend.res.final_simplex[1])
-print("iterNum = ", opt_backend.res.nit)
+# print("f simplex: ", opt_backend.res.final_simplex[1])
+# print("iterNum = ", opt_backend.res.nit)
 #
 #
 #
