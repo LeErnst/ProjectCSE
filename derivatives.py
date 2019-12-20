@@ -85,9 +85,9 @@ def grad(func, x, h):
     print(grad)
     return grad
 
-def hessian(func,x,h=np.sqrt(np.finfo(float).eps)):
+def hessian(func,x,h=numpy.sqrt(numpy.finfo(float).eps)):
     dim = len(x)
-    hessian = np.empty([dim,dim])
+    hessian = numpy.empty([dim,dim])
     E = numpy.eye(dim,dim)
 
     for i in range(dim):
