@@ -84,4 +84,17 @@ def grad(func, x, h):
         grad[i] = (func(x+h*E[i,:]) - func(x-h*E[i,:]))/(2*h)
     print(grad)
     return grad
+
+def hessian(func,x,h=np.sqrt(np.finfo(float).eps)):
+    dim = len(x)
+    hessian = np.empty([dim,dim])
+    E = numpy.eye(dim,dim)
+
+    for i in range(dim):
+        for j in range(dim):
+            hessian[i,j] = (func(x+h*E[i,:]+h*E[j,:])-func(x+h*E[i,:]) - \
+                            func(x+h*E[j,:])+func(x)) / (h**2)
+    return hessian
+
+    
  
