@@ -16,12 +16,6 @@ from pyrateoptics.sampling2d                            import raster
 from pyrateoptics.raytracer.ray                         import RayPath
 from pyrateoptics.raytracer.ray                         import RayBundle
 
-# for the benchmark-function:
-from pyrateoptics.optimize.optimize_backends            import ScipyBackend
-#from project_optimize_backends                         import ProjectScipyBackend
-from pyrateoptics.optimize.optimize                     import Optimizer
-from copy import deepcopy
-import time
 
 #---------------------------------------
 #Writes data to a file
@@ -559,93 +553,4 @@ def eval_c(x, bdry) :
         cnt = cnt + 1
 
     return c_x
-
-
-def benchmark(OpticalSystem,meritfunctionrms,updatefunction,ScipyMet,ProjectMet):
-    """
-    ScipyMet = List with the methods out of Scipy (actual only non-constrained algos)
-    meritfunction = meritfunction you want to use
-    updatefunction = updatefunction you want to use
-
-    For NlOpt you have to do:
-                pip install nlopt --no-clean
-    """
-    # All for Scipy-Methods:----------------------------------------------------   """
-    # Create a list with ScipyBackend-Objects for all Methods:
-    listOptBackend = []
-    for met in ScipyMet:
-        listOptBackend.append(ScipyBackend(method = met,
-                         options={'maxiter': 10, 'disp': False}, tol=1e-10))
-
-    for met in ProjectMet:
-        listOptBackend.append(ProjectScipyBackend(optimize_func=met,\
-                            options={'maxiter':100, 'xatol':1e-5, \
-                                     'fatol':1e-5}))
-    
-    # create a list to safe results:
-    header = ["Verfahren", "NumberOfCalls", "MeritFinal", "Time"]
-    Result = [[] for i in range(len(ScipyMet)+len(ProjectMet)+1)]
-    Result[0].append(header)
-    for i in range(len(ScipyMet)):
-        Result[i+1].append(ScipyMet[i])
-    for i in range(len(ProjectMet)):
-        Result[len(ScipyMet)+i+1].append(ProjectMet[i].func_name)
-    
-    # loop over all methods:
-    counter1 = 1
-    for met in listOptBackend:
-        OS = deepcopy(OpticalSystem)            # copy of OS for every method
-        optimi = Optimizer(OS,
-                    meritfunctionrms,
-                    backend=met,
-                    updatefunction=updatefunction)
-            
-        # Functions for jacobian and hessian for scipy.minimize function:
-        def jacobian(x):
-            eps = np.sqrt(np.finfo(float).eps)
-            func=optimi.MeritFunctionWrapper
-            grad = np.ones(len(x))
-            for i in range(len(x)):
-                x_neu1 = deepcopy(x)
-                x_neu2 = deepcopy(x)
-                x_neu1[i] = x_neu1[i] + eps
-                x_neu2[i] = x_neu2[i] - eps
-                grad[i] = (func(x_neu1)-func(x_neu2))/(2*eps)
-            return grad
-
-        def hessian(x):
-            eps = np.sqrt(np.finfo(float).eps)
-            func = optimi.MeritFunctionWrapper
-            hes = np.ones((len(x),len(x)))
-            for i in range(len(x)):
-                for j in range(len(x)):
-                    x_neu1 = deepcopy(x)
-                    x_neu2 = deepcopy(x)
-                    x_neu3 = deepcopy(x)
-                    x_neu1[i] += eps
-                    x_neu1[j] += eps
-                    x_neu2[i] += eps
-                    x_neu3[j] += eps
-
-                    hes[i,j] = (func(x_neu1)-func(x_neu2)-func(x_neu3)+func(x)) / eps**2
-            return hes
-        
-        if counter1 <= len(ScipyMet):
-            temp = {"jac": jacobian, "hess": hessian}   # add to options of backend
-            met.options.update(temp)
-
-        # start optimization run:
-        start = time.time()
-        OS = optimi.run()
-        ende = time.time()
-
-        # save results in list "Result":
-        Result[counter1].append(optimi.NoC)
-        Result[counter1].append(met.res.fun)
-        Result[counter1].append(ende-start)
-        counter1 += 1
-
-        # show actual "Result":
-        for row in Result:
-            print(row)
 
