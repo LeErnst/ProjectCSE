@@ -572,5 +572,3 @@ def my_log(x) :
 
     return res
 
-=======
->>>>>>> faacda51ed5e7c23bbeb0c183d1e674adcb61eb0
