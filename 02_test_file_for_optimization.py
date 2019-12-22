@@ -49,7 +49,8 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      SimulatedAnnealingBackend)
 from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
-                                       sgd)
+                                       sgd,
+                                       gradient_descent)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -159,10 +160,6 @@ def osupdate(my_s):
 
 # ----- choose the backend
 
-# opt_backend = ScipyBackend(method='Nelder-Mead',
-#                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
-
-
 
 #*******************************************************************************
 #****ALS FUNKTION AUSLAGERN???**************************************************
@@ -171,10 +168,15 @@ def osupdate(my_s):
 
 # possible methodparams = {standard, penalty, penalty-lagrange, log}
 
-opt_backend = ProjectScipyBackend(optimize_func='nelder-mead',#test_minimize_neldermead,
+# for problems increase the stepsize
+opt_backend = ProjectScipyBackend(optimize_func=gradient_descent,
                                   methodparam='penalty-lagrange',
-                                  options={'maxiter': 50 , 'xatol': 1e-5,\
-                                           'fatol': 1e-5})
+                                  options={'maxiter': 50 , 'stepsize': 1e-8})
+
+#opt_backend = ProjectScipyBackend(optimize_func='nelder-mead',#test_minimize_neldermead,
+#                                  methodparam='penalty-lagrange',
+#                                  options={'maxiter': 50 , 'xatol': 1e-5,\
+#                                           'fatol': 1e-5})
 
 # ----- create optimizer object
 optimi = Optimizer(s,

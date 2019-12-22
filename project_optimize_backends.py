@@ -10,14 +10,14 @@ from derivatives import grad, grad_pen, grad_lag, grad_log
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log
 
 class ProjectScipyBackend(Backend):
-    def __init__(self, optimize_func, methodparam=None, tau0=0.0,
+    def __init__(self, optimize_func, methodparam=None, tau0=1.0,
                  options={}, **kwargs):
         self.optimize_func = optimize_func
         self.options       = options
         self.methodparam   = methodparam
         self.kwargs        = kwargs
         self.tauk          = tau0
-        self.lamk          = 0.
+        self.lamk          = 1.
         # self.func=MeritFunctionWrapper is set within the Optimizer __init__ 
 
     def update_PSB(self, optimi) :
@@ -29,21 +29,27 @@ class ProjectScipyBackend(Backend):
         '''
 
         self.bdry = get_bdry(optimi)
-        print('self bdry in PSB:')
+        print('\nbdry in ProjectScipyBackend:')
         print(self.bdry)
     
     def run(self, x0):
         # tolerance for the infeasibility measurement 
         tol_seq = 10*numpy.finfo(float).eps 
+        # number of iterations
         iterNum = 0
+        # h for the gradient
+        h = 1e-8
+        
+        print('\nx0 =')
+        print(x0)
+        print('\nmeritfunction(x_0) =')
+        print(self.func(x0))
 
         if (self.methodparam == 'standard'):
 
             # optimize: meritfunction(x)
 
             print('----------------- run standard -----------------')
-            print('\nx0 =')
-            print(x0)
 
             # find local minimizer of meritfunction(x)
             res = minimize(self.func, 
@@ -59,26 +65,24 @@ class ProjectScipyBackend(Backend):
 
             print('----------------- run penalty -----------------')
 
-            # define the gradient for the penalty method
-            def grad_total(x):
-                h = 1e-6
-                res = grad(self.func, x, h) +\
-                            grad_pen(x,self.bdry,self.tau0)
-                return res
-            
-            # store the grad-function in options
-            self.options['grad'] = grad_total
-
-            # for benchmark
-            self.kwargs['jac'] = grad_total
-            
             xk_1 = x0
             xk   = x0
             while (1): 
+                # define the gradient for the penalty method
+                def grad_total(x):
+                    res = grad(self.func, x, h) +\
+                          grad_pen(x,self.bdry,self.tauk)
+                    return res
+                # store the grad-function in options
+                self.options['grad'] = grad_total
+
+                # for benchmark
+                self.kwargs['jac'] = grad_total
+ 
                 # update iteration number
                 iterNum += 1
-                print('\nx_k =')
-                print(xk)
+                print('\niteration number =')
+                print(iterNum)
                 print('\nbdry =')
                 print(self.bdry)
                 print('\ntau =')
@@ -128,35 +132,40 @@ class ProjectScipyBackend(Backend):
 
             # choose the initial lamda
             self.lamk = 0.333*numpy.ones(2*len(x0))
-            
-            # define the gradient for the penalty-lagrange-function
-            def grad_total(x):
-                h = 1e-6
-                res = grad(self.func, x, h) +\
-                            grad_lag(x,self.bdry,self.tauk,self.lamk)
-                return res
-            
-            # store the grad-function in options
-            self.options['grad']= grad_total
-            
-            # for benchmark
-            self.kwargs['jac'] = grad_total
 
             xk_1 = x0
             xk   = x0
             while (1): 
+             
+                # define the gradient for the penalty-lagrange-function
+                def grad_total(x):
+                    res = grad(self.func, x, h) +\
+                          grad_lag(x,self.bdry,self.tauk,self.lamk)
+                    return res
+            
+                # store the grad-function in options
+                self.options['grad']= grad_total
+            
+                # for benchmark
+                self.kwargs['jac'] = grad_total
+
                 # update iteration number
                 iterNum += 1
-                print('\nx_k =')
-                print(xk)
+                print('\niteration number =')
+                print(iterNum)
                 print('\nbdry =')
                 print(self.bdry)
                 print('\ntau_k =')
                 print(self.tauk)
                 print('\nlambda_k =')
                 print(self.lamk)
-                print('\ngradient of the penalty term')
+                print('\ngradient of the penalty-lambda term')
                 print(grad_pen(xk,self.bdry, self.tauk))
+
+                print("\ndebugging in project_optimize_backends.py line 164\n")
+                # calculate the gradient manually
+                print(self.func(xk+1e-8), self.func(xk-1e-8))
+                print((self.func(xk+1e-8)-self.func(xk-1e-8))/(2*1e-8))
 
                 # find local minimizer of 
                 # meritfunction(x) + (lambda_k)^T h(x) + 0.5*tau_k*||h(x)||_2^2
@@ -203,26 +212,25 @@ class ProjectScipyBackend(Backend):
             self.my = 1.0 # '.0' is important, otherwise its an integer and my=0 
                           # in second step!
 
-            # define the gradient for the log-barrier method
-            def grad_total(x):
-                h = 1e-6
-                res = grad(self.func, x, h) -\
-                           grad_log(x,self.bdry,self.my)
-                return res
-
-            # store the grad-function in options
-            self.options['grad']= grad_total
-
-            # for benchmark
-            self.kwargs['jac'] = grad_total
-
             xk_1 = x0
             xk   = x0
             while (1):
-                # update iteration number
+                # define the gradient for the log-barrier method
+                def grad_total(x):
+                    res = grad(self.func, x, h) -\
+                          grad_log(x,self.bdry,self.my)
+                    return res
+
+                # store the grad-function in options
+                self.options['grad']= grad_total
+
+                # for benchmark
+                self.kwargs['jac'] = grad_total
+
+               # update iteration number
                 iterNum += 1
-                print('\nxk =')
-                print(xk)
+                print('\niteration number =')
+                print(iterNum)
 
                 # find local minimizer of for the barrier method
                 res = minimize(lambda x: self.func(x) - self.my*numpy.sum(
@@ -242,6 +250,8 @@ class ProjectScipyBackend(Backend):
                 print(res.x)
                 print('\nmeritfunction(x_k) =')
                 print(self.func(res.x))
+
+                # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
                 if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
                     print('\n---------- end of log barrier run----------')
                     print('\nTerminated in iteration = ')
@@ -320,6 +330,22 @@ def sgd(func, x0, args,
 
     return OptimizeResult(fun=func(xopt), x=xopt, nit=iterNum)
 
+def gradient_descent(func, x0, args=(),
+                     maxiter=100, stepsize=1e-8, **unkown_options):
+    xk = x0
+    grad = unkown_options['grad']
+    iternum = 0 
+
+    while (iternum < maxiter):
+        iternum += 1
+        xk -= stepsize*grad(xk)
+        if (numpy.linalg.norm(grad(xk), numpy.inf) < 1e-8):
+            print('gradient is near zero')
+            break
+
+    print("\ngradient in gradient decsent for x_final = ")
+    print(grad(xk))
+    return OptimizeResult(fun=func(xk), x=xk, nit=iternum)
 
 def test_minimize_neldermead(func, x0, args=(), 
                              maxiter=100, 
