@@ -30,7 +30,7 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      SimulatedAnnealingBackend)  
                                                                                  
 # --- auxiliarys                                                                 
-from auxiliary_functions import error2squared, error1 
+from auxiliary_functions import error2squared, error1, eval_h, eval_c 
 
 
 
@@ -84,4 +84,42 @@ def grad(func, x, h):
         grad[i] = (func(x+h*E[i,:]) - func(x-h*E[i,:]))/(2*h)
     print(grad)
     return grad
- 
+
+def grad_pen(x, bdry, tau) :
+    dim = len(x)
+    grad = numpy.zeros(dim)
+    h_x = eval_h(x, bdry)
+
+    for i in range(2*dim) :
+        if h_x[i] != 0 :
+            grad[int(numpy.floor(float(i)/2))] = tau*h_x[i]*numpy.power(-1, i+1)
+
+    return grad
+
+
+def grad_lag(x, bdry, tau, lam) :
+    dim = len(x)
+    grad = numpy.zeros(dim)
+    h_x = eval_h(x, bdry)
+
+    for i in range(2*dim) :
+        if h_x[i] != 0 :
+            grad[int(numpy.floor(float(i)/2))] = (lam[i] + tau*h_x[i])*\
+                                                            numpy.power(-1, i+1)
+
+    return grad
+
+
+def grad_log(x, bdry, my) :
+    dim = len(x)
+    grad = numpy.zeros(dim)
+    c_x = eval_c(x, bdry)
+
+    for i in range(2*dim) :
+        if c_x[i] != 0 :
+            grad[int(numpy.floor(float(i)/2))] += (my/c_x[i])*\
+                                                        numpy.power(-1,i)
+            #now it is -1^i, as c(x) is now c(x)>=0, and not c(x)=0 as it was
+            #before in grad_lag and grad_pen!
+
+    return grad

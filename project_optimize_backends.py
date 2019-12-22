@@ -6,11 +6,11 @@ from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
 from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
-from derivatives import grad
-from auxiliary_functions import get_bdry, eval_h, eval_c
+from derivatives import grad, grad_pen, grad_lag, grad_log
+from auxiliary_functions import get_bdry, eval_h, eval_c, my_log
 
 class ProjectScipyBackend(Backend):
-    def __init__(self, optimize_func, methodparam=None, tau0=1,
+    def __init__(self, optimize_func, methodparam=None, tau0=0.0,
                  options={}, **kwargs):
         self.optimize_func = optimize_func
         self.options = options
@@ -25,7 +25,6 @@ class ProjectScipyBackend(Backend):
         you want to run the optimization with penalty/lagrange terms. It is
         important to call this function AFTER the Optimizer object was created
         and BEFORE you run the optimization.
-        TODO: wie kann man das automatisieren?
         '''
 
         self.bdry = get_bdry(optimi)
@@ -36,6 +35,9 @@ class ProjectScipyBackend(Backend):
         # here we could implement the try/except construct to handle the case if 
         # methodparam is None or no gradient is passed but is requiered by the 
         # optimization method and so on
+
+        tol_seq = 0.01  #tolerance for sequence of optimization (pen/lag/log)
+
         if (self.methodparam == 1):
             #No Penalty, no Lagrange terms
             res = minimize(self.func, 
@@ -47,12 +49,28 @@ class ProjectScipyBackend(Backend):
         elif (self.methodparam == 2):
             #Penalty term, but no Lagrange term
 
+            ########DEFINE GRADIENT###########
+            def grad_total(x):
+                h = 0.0000001
+                res = grad(self.fun, x, h) +\
+                            grad_pen(x,self.bdry,self.tau0)
+                return res
+            
+            self.options['grad']= grad_total
+            ########
+            
+            
             #################Iteration over different Tau's
-
-            normalt = numpy.linalg.norm(x0)
-            for i in range(4): #max amount of different tau's
+            xalt = x0
+            for i in range(15): #max amount of different tau's
                 print('x0 in run =')
                 print(x0)
+                print('bdry in run =')
+                print(self.bdry)
+                print('tau')
+                print(self.tau0)
+                print('grad pen in run')
+                print(grad_pen(x0,self.bdry, self.tau0))
                 res = minimize(lambda x: self.func(x) +
                                         0.5*self.tau0*numpy.square(
                                         numpy.linalg.norm(eval_h(x,self.bdry))), 
@@ -63,16 +81,16 @@ class ProjectScipyBackend(Backend):
                                **self.kwargs)
                 x0 = res.x
                 #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
-                normneu = numpy.linalg.norm(x0)
-                print('normen')
-                print(normneu)
-                print(normalt)
                 print('meritwert')
                 print(self.func(x0))
-                if numpy.absolute(normneu-normalt)<0.01 :
+                if numpy.absolute(numpy.linalg.norm(x0-xalt))<tol_seq :
+                    print('\n\n\
+                           ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
+                    print(i)
                     break
 
-                normalt = normneu       #update resalt
+                xalt = x0                               #update resalt
+                
                 self.tau0 = 7*self.tau0 #update tau
             ##############
         
@@ -80,19 +98,27 @@ class ProjectScipyBackend(Backend):
         elif (self.methodparam == 3):
             #Both, Penalty and Lagrange Term
             
+            self.lam = 0.333*numpy.ones(2*len(x0))
+            ########DEFINE GRADIENT###########
+            def grad_total(x):
+                h = 0.0000001
+                res = grad(self.fun, x, h) +\
+                            grad_lag(x,self.bdry,self.tau0,self.lam)
+                return res
+            
+            self.options['grad']= grad_total
+            ########
             
             #################Iteration over different Tau's
-
-            normalt = numpy.linalg.norm(x0)
-            lam = numpy.ones(2*len(x0))
-            for i in range(4): #max amount of different tau's
+            xalt = x0
+            for i in range(15): #max amount of different tau's
                 print('x0 in run =')
                 print(x0)
                 res = minimize(lambda x: self.func(x) +
                                         0.5*self.tau0*numpy.square(
                                         numpy.linalg.norm(eval_h(x,self.bdry)))
                                                        + 
-                                        numpy.dot(lam,eval_h(x,self.bdry)), 
+                                        numpy.dot(self.lam,eval_h(x,self.bdry)), 
                                x0=x0, 
                                args=(), 
                                method=self.optimize_func,
@@ -100,33 +126,43 @@ class ProjectScipyBackend(Backend):
                                **self.kwargs)
                 x0 = res.x
                 #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
-                normneu = numpy.linalg.norm(x0)
-                print('normen')
-                print(normneu)
-                print(normalt)
                 print('meritwert')
                 print(self.func(x0))
-                if numpy.absolute(normneu-normalt)<0.01 :
+                if numpy.absolute(numpy.linalg.norm(x0-xalt))<tol_seq :
+                    print('\n\n\
+                           ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
+                    print(i)
                     break
 
-                normalt = normneu                               #update resalt
-                lam = numpy.add(lam, self.tau0*eval_h(x0, self.bdry))#update lam
-                self.tau0 = 7*self.tau0                         #update tau
+                xalt = x0                               #update resalt
+                self.lam = numpy.add(self.lam, self.tau0*eval_h(x0, self.bdry))
+                                                        #update lam
+                self.tau0 = 7*self.tau0                 #update tau
             ##############
         
         elif (self.methodparam == 4):
             # Logarithmic Barrier Method
-            #MACHT DAS BEI UNS SINN???? ICH GLAUBE NICHT????????
+            
+            self.my = 1.0 # '.0' is important, otherwise its an integer and my=0 
+                          # in second step!
+            ########DEFINE GRADIENT###########
+            def grad_total(x):
+                h = 0.0000001
+                res = grad(self.fun, x, h) -\
+                            grad_log(x,self.bdry,self.my)
+                return res
+            
+            self.options['grad']= grad_total
+            ########
+            
+            
             #################Iteration over different my's
-            my = 1
-            normalt = numpy.linalg.norm(x0)
-            for i in range(4): #max amount of different my's
+            xalt = x0
+            for i in range(15): #max amount of different my's
                 print('x0 in run =')
                 print(x0)
-                print('c_x in run')
-                print(eval_c(x0,self.bdry))
-                res = minimize(lambda x: self.func(x) - my*numpy.sum(
-                                                numpy.log(eval_c(x,self.bdry))),
+                res = minimize(lambda x: self.func(x) - self.my*numpy.sum(
+                                                my_log(eval_c(x,self.bdry))),
                                x0=x0, 
                                args=(), 
                                method=self.optimize_func,
@@ -135,16 +171,17 @@ class ProjectScipyBackend(Backend):
                 x0 = res.x
                 #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
                 normneu = numpy.linalg.norm(x0)
-                print('normen')
-                print(normneu)
-                print(normalt)
                 print('meritwert')
                 print(self.func(x0))
-                if numpy.absolute(normneu-normalt)<0.01 :
+                if numpy.absolute(numpy.linalg.norm(x0-xalt))<tol_seq :
+                    print('\n\n\
+                           ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
+                    print(i)
                     break
 
-                normalt = normneu                  #update resalt
-                my = my/10                         #update my
+                xalt = x0                          #update resalt
+
+                self.my = self.my/10               #update my
             ##############
 
         else:

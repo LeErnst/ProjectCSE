@@ -649,3 +649,21 @@ def benchmark(OpticalSystem,meritfunctionrms,updatefunction,ScipyMet,ProjectMet)
         for row in Result:
             print(row)
 
+
+def my_log(x) :
+    '''
+    Returns log(x) if x>0, and -999999999999999 if x<=0
+    '''
+
+    res = np.zeros(len(x))
+    cnt = 0
+    for xi in x :
+        if xi>0:
+            res[cnt] = np.log(xi)
+            cnt = cnt + 1
+        else:
+            res[cnt] = -9999999999999999
+            cnt = cnt + 1
+
+    return res
+
