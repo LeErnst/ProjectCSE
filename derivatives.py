@@ -82,30 +82,31 @@ def grad(func, x, h):
     # calculate the gradient with finit differences
     for i in range(dim):
         grad[i] = (func(x+h*E[i,:]) - func(x-h*E[i,:]))/(2*h)
-    print(grad)
+
     return grad
 
 def grad_pen(x, bdry, tau) :
+    # gradient of the penalty term
     dim = len(x)
     grad = numpy.zeros(dim)
     h_x = eval_h(x, bdry)
 
     for i in range(2*dim) :
         if h_x[i] != 0 :
-            grad[int(numpy.floor(float(i)/2))] = tau*h_x[i]*numpy.power(-1, i+1)
+            grad[i/2] = tau*h_x[i]*numpy.power(-1, i+1)
 
     return grad
 
 
 def grad_lag(x, bdry, tau, lam) :
+    # gradient of the lambda-term + gradient of the penalty-term
     dim = len(x)
     grad = numpy.zeros(dim)
     h_x = eval_h(x, bdry)
 
     for i in range(2*dim) :
         if h_x[i] != 0 :
-            grad[int(numpy.floor(float(i)/2))] = (lam[i] + tau*h_x[i])*\
-                                                            numpy.power(-1, i+1)
+            grad[i/2] = (lam[i] + tau*h_x[i])*numpy.power(-1, i+1)
 
     return grad
 
@@ -117,8 +118,8 @@ def grad_log(x, bdry, my) :
 
     for i in range(2*dim) :
         if c_x[i] != 0 :
-            grad[int(numpy.floor(float(i)/2))] += (my/c_x[i])*\
-                                                        numpy.power(-1,i)
+            grad[i/2] += (my/c_x[i])*numpy.power(-1,i)
+
             #now it is -1^i, as c(x) is now c(x)>=0, and not c(x)=0 as it was
             #before in grad_lag and grad_pen!
 

@@ -168,8 +168,11 @@ def osupdate(my_s):
 #****ALS FUNKTION AUSLAGERN???**************************************************
 #*******************************************************************************
 # choose our own backend for testing some algos
+
+# possible methodparams = {standard, penalty, penalty-lagrange, log}
+
 opt_backend = ProjectScipyBackend(optimize_func='nelder-mead',#test_minimize_neldermead,
-                                  methodparam=4,
+                                  methodparam='penalty',
                                   options={'maxiter': 50 , 'xatol': 1e-5,\
                                            'fatol': 1e-5})
 

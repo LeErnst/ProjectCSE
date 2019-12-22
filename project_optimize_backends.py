@@ -10,13 +10,13 @@ from derivatives import grad, grad_pen, grad_lag, grad_log
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log
 
 class ProjectScipyBackend(Backend):
-    def __init__(self, optimize_func, methodparam=None, tau0=0.0,
+    def __init__(self, optimize_func, methodparam='standard', tau0=0.0,
                  options={}, **kwargs):
         self.optimize_func = optimize_func
-        self.options = options
-        self.methodparam = methodparam
-        self.kwargs = kwargs
-        self.tau0   = tau0
+        self.options       = options
+        self.methodparam   = methodparam
+        self.kwargs        = kwargs
+        self.tau0          = tau0
         # self.func=MeritFunctionWrapper is set within the Optimizer __init__ 
 
     def update_PSB(self, optimi) :
@@ -32,13 +32,14 @@ class ProjectScipyBackend(Backend):
         print(self.bdry)
     
     def run(self, x0):
-        # here we could implement the try/except construct to handle the case if 
-        # methodparam is None or no gradient is passed but is requiered by the 
-        # optimization method and so on
 
         tol_seq = 0.01  #tolerance for sequence of optimization (pen/lag/log)
 
-        if (self.methodparam == 1):
+        if (self.methodparam == 'standard'):
+            print('----------------- run standard -----------------')
+            print('\nx0 in run =')
+            print(x0)
+
             #No Penalty, no Lagrange terms
             res = minimize(self.func, 
                            x0=x0, 
@@ -46,30 +47,34 @@ class ProjectScipyBackend(Backend):
                            method=self.optimize_func,
                            options=self.options, 
                            **self.kwargs)
-        elif (self.methodparam == 2):
+            
+        elif (self.methodparam == 'penalty'):
             #Penalty term, but no Lagrange term
+            print('----------------- run penalty -----------------')
 
             ########DEFINE GRADIENT###########
             def grad_total(x):
                 h = 0.0000001
-                res = grad(self.fun, x, h) +\
+                res = grad(self.func, x, h) +\
                             grad_pen(x,self.bdry,self.tau0)
                 return res
             
-            self.options['grad']= grad_total
+            self.options['grad'] = grad_total
             ########
-            
+
+            # for benchmark
+            self.kwargs['jac'] = grad_total
             
             #################Iteration over different Tau's
             xalt = x0
             for i in range(15): #max amount of different tau's
-                print('x0 in run =')
-                print(x0)
-                print('bdry in run =')
+                print('\nx_k =')
+                print(xk)
+                print('\nbdry =')
                 print(self.bdry)
-                print('tau')
+                print('\ntau =')
                 print(self.tau0)
-                print('grad pen in run')
+                print('\ngradient of the penalty term')
                 print(grad_pen(x0,self.bdry, self.tau0))
                 res = minimize(lambda x: self.func(x) +
                                         0.5*self.tau0*numpy.square(
@@ -95,9 +100,10 @@ class ProjectScipyBackend(Backend):
             ##############
         
         
-        elif (self.methodparam == 3):
+        elif (self.methodparam == 'penalty-lagrange'):
             #Both, Penalty and Lagrange Term
-            
+            print('----------------- run penalty lagrange -----------------')
+
             self.lam = 0.333*numpy.ones(2*len(x0))
             ########DEFINE GRADIENT###########
             def grad_total(x):
@@ -109,6 +115,9 @@ class ProjectScipyBackend(Backend):
             self.options['grad']= grad_total
             ########
             
+            # for benchmark
+            self.kwargs['jac'] = grad_total
+
             #################Iteration over different Tau's
             xalt = x0
             for i in range(15): #max amount of different tau's
@@ -117,7 +126,7 @@ class ProjectScipyBackend(Backend):
                 res = minimize(lambda x: self.func(x) +
                                         0.5*self.tau0*numpy.square(
                                         numpy.linalg.norm(eval_h(x,self.bdry)))
-                                                       + 
+                                        + 
                                         numpy.dot(self.lam,eval_h(x,self.bdry)), 
                                x0=x0, 
                                args=(), 
@@ -140,9 +149,10 @@ class ProjectScipyBackend(Backend):
                 self.tau0 = 7*self.tau0                 #update tau
             ##############
         
-        elif (self.methodparam == 4):
+        elif (self.methodparam == 'log'):
             # Logarithmic Barrier Method
-            
+            print('----------------- run log barrier -----------------')
+
             self.my = 1.0 # '.0' is important, otherwise its an integer and my=0 
                           # in second step!
             ########DEFINE GRADIENT###########
@@ -154,8 +164,10 @@ class ProjectScipyBackend(Backend):
             
             self.options['grad']= grad_total
             ########
-            
-            
+
+            # for benchmark
+            self.kwargs['jac'] = grad_total
+
             #################Iteration over different my's
             xalt = x0
             for i in range(15): #max amount of different my's
@@ -185,7 +197,7 @@ class ProjectScipyBackend(Backend):
             ##############
 
         else:
-            print("Something is gone wrong in the ProjectScipyBackend class!")
+            print('Methodparam not found!')
             sys.exit()
 
         self.res = res
