@@ -163,7 +163,7 @@ def osupdate(my_s):
 #                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
 
 
-
+"""
 #*******************************************************************************
 #****ALS FUNKTION AUSLAGERN???**************************************************
 #*******************************************************************************
@@ -215,3 +215,4 @@ plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 
 plt.show()
+"""

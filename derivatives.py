@@ -123,3 +123,15 @@ def grad_log(x, bdry, my) :
             #before in grad_lag and grad_pen!
 
     return grad
+
+def hessian(func,x,h=numpy.sqrt(numpy.finfo(float).eps)):
+    dim = len(x)
+    hessian = numpy.empty([dim,dim])
+    E = numpy.eye(dim,dim)
+
+    for i in range(dim):
+        for j in range(dim):
+            hessian[i,j] = (func(x+h*E[i,:]+h*E[j,:])-func(x+h*E[i,:]) - \
+                            func(x+h*E[j,:])+func(x)) / (h**2)
+    return hessian
+
