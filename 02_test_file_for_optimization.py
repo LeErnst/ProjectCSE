@@ -118,7 +118,7 @@ numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength, 
-                                    whichmeritfunc='sgd', 
+                                    whichmeritfunc='standard', 
                                     error='error2')
 
 
@@ -172,7 +172,7 @@ def osupdate(my_s):
 # possible methodparams = {standard, penalty, penalty-lagrange, log}
 
 opt_backend = ProjectScipyBackend(optimize_func='nelder-mead',#test_minimize_neldermead,
-                                  methodparam='penalty',
+                                  methodparam='penalty-lagrange',
                                   options={'maxiter': 50 , 'xatol': 1e-5,\
                                            'fatol': 1e-5})
 

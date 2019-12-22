@@ -10,7 +10,7 @@ from derivatives import grad, grad_pen, grad_lag, grad_log
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log
 
 class ProjectScipyBackend(Backend):
-    def __init__(self, optimize_func, methodparam='standard', tau0=0.0,
+    def __init__(self, optimize_func, methodparam=None, tau0=0.0,
                  options={}, **kwargs):
         self.optimize_func = optimize_func
         self.options       = options
@@ -33,43 +33,50 @@ class ProjectScipyBackend(Backend):
         print(self.bdry)
     
     def run(self, x0):
-
-        tol_seq = 0.01  #tolerance for sequence of optimization (pen/lag/log)
+        # tolerance for the infeasibility measurement 
+        tol_seq = 10*numpy.finfo(float).eps 
+        iterNum = 0
 
         if (self.methodparam == 'standard'):
+
+            # optimize: meritfunction(x)
+
             print('----------------- run standard -----------------')
             print('\nx0 =')
             print(x0)
 
-            #No Penalty, no Lagrange terms
+            # find local minimizer of meritfunction(x)
             res = minimize(self.func, 
                            x0=x0, 
                            args=(), 
                            method=self.optimize_func,
                            options=self.options, 
                            **self.kwargs)
-            
+
         elif (self.methodparam == 'penalty'):
-            #Penalty term, but no Lagrange term
+
+            # optimize: meritfunction(x) + 0.5*tau*||h(x)||_2^2
+
             print('----------------- run penalty -----------------')
 
-            ########DEFINE GRADIENT###########
+            # define the gradient for the penalty method
             def grad_total(x):
-                h = 0.0000001
+                h = 1e-6
                 res = grad(self.func, x, h) +\
                             grad_pen(x,self.bdry,self.tau0)
                 return res
             
+            # store the grad-function in options
             self.options['grad'] = grad_total
-            ########
 
             # for benchmark
             self.kwargs['jac'] = grad_total
             
-            #################Iteration over different Tau's
             xk_1 = x0
             xk   = x0
-            for i in range(15): #max amount of different tau's
+            while (1): 
+                # update iteration number
+                iterNum += 1
                 print('\nx_k =')
                 print(xk)
                 print('\nbdry =')
@@ -78,6 +85,9 @@ class ProjectScipyBackend(Backend):
                 print(self.tauk)
                 print('\ngradient of the penalty term')
                 print(grad_pen(xk,self.bdry, self.tauk))
+
+                # find local minimizer of 
+                # meritfunction(x) + 0.5*tau_k*||h(x)||_2^2
                 res = minimize(lambda x: self.func(x) +
                                         0.5*self.tauk*numpy.square(
                                         numpy.linalg.norm(eval_h(x,self.bdry))), 
@@ -86,44 +96,57 @@ class ProjectScipyBackend(Backend):
                                method=self.optimize_func,
                                options=self.options, 
                                **self.kwargs)
+                # update xk
                 xk = res.x
-                #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
-                print('\nmeritwert=')
-                print(self.func(xk))
-                if numpy.absolute(numpy.linalg.norm(xk-xk_1))<tol_seq :
-                    print('\n\n\
-                           ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
-                    print(i)
-                    break
 
-                xk_1 = xk  # update resalt
-                
-                self.tauk = 7*self.tauk #update tau
-            ##############
-        
-        
+                print('\nx_k =')
+                print(res.x)
+                print('\nmeritfunction(x_k) =')
+                print(self.func(res.x))
+
+                # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
+                if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
+                    print('\n----------- end of penalty run -----------')
+                    print('\nTerminated in iteration = ')
+                    print(iterNum)
+                    print('\n||h(x)||_inf = ')
+                    print(numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf))
+                    break
+                else: # xk is not in the feasible set -> update tauk
+                    # update tau
+                    self.tauk = 7*self.tauk 
+
+                # update xk-1 
+                xk_1 = xk
+
+
         elif (self.methodparam == 'penalty-lagrange'):
-            #Both, Penalty and Lagrange Term
+
+            # optimize: meritfunction(x) + lambda^T h(x) + 0.5*tau*||h(x)||_2^2
+
             print('----------------- run penalty lagrange -----------------')
 
+            # choose the initial lamda
             self.lamk = 0.333*numpy.ones(2*len(x0))
-            ########DEFINE GRADIENT###########
+            
+            # define the gradient for the penalty-lagrange-function
             def grad_total(x):
-                h = 0.0000001
+                h = 1e-6
                 res = grad(self.func, x, h) +\
                             grad_lag(x,self.bdry,self.tauk,self.lamk)
                 return res
             
+            # store the grad-function in options
             self.options['grad']= grad_total
-            ########
             
             # for benchmark
             self.kwargs['jac'] = grad_total
 
-            #################Iteration over different Tau's
             xk_1 = x0
             xk   = x0
-            for i in range(15): #max amount of different tau's
+            while (1): 
+                # update iteration number
+                iterNum += 1
                 print('\nx_k =')
                 print(xk)
                 print('\nbdry =')
@@ -134,6 +157,9 @@ class ProjectScipyBackend(Backend):
                 print(self.lamk)
                 print('\ngradient of the penalty term')
                 print(grad_pen(xk,self.bdry, self.tauk))
+
+                # find local minimizer of 
+                # meritfunction(x) + (lambda_k)^T h(x) + 0.5*tau_k*||h(x)||_2^2
                 res = minimize(lambda x: self.func(x) +
                                         0.5*self.tauk*numpy.square(
                                         numpy.linalg.norm(eval_h(x,self.bdry)))
@@ -144,47 +170,61 @@ class ProjectScipyBackend(Backend):
                                method=self.optimize_func,
                                options=self.options, 
                                **self.kwargs)
+                # update xk
                 xk = res.x
-                #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
-                print('meritwert')
-                print(self.func(xk))
-                if numpy.absolute(numpy.linalg.norm(xk-xk_1))<tol_seq :
-                    print('\n\n\
-                           ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
-                    print(i)
-                    break
 
-                xk_1 = xk                               #update resalt
-                self.lamk = numpy.add(self.lamk, self.tauk*eval_h(xk, self.bdry))
-                                                        #update lam
-                self.tauk = 7*self.tauk                 #update tau
-            ##############
-        
+                print('\nx_k=')
+                print(res.x)
+                print('\nmeritfunction(x_k) =')
+                print(self.func(res.x))
+
+                # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
+                if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
+                    print('\n---------- end of penalty lagrange run ----------')
+                    print('\nTerminated in iteration = ')
+                    print(iterNum)
+                    print('\n||h(x)||_inf = ')
+                    print(numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf))
+                    break
+                else: # xk is not in the feasible set -> update tauk and lambdak
+                    # update tau
+                    self.tauk = 7*self.tauk
+                    # update lambda
+                    self.lamk = numpy.add(self.lamk, 
+                                          self.tauk*eval_h(xk, self.bdry))
+                # update xk-1
+                xk_1 = xk
+
+
         elif (self.methodparam == 'log'):
             # Logarithmic Barrier Method
             print('----------------- run log barrier -----------------')
 
             self.my = 1.0 # '.0' is important, otherwise its an integer and my=0 
                           # in second step!
-            ########DEFINE GRADIENT###########
+
+            # define the gradient for the log-barrier method
             def grad_total(x):
-                h = 0.0000001
+                h = 1e-6
                 res = grad(self.func, x, h) -\
                            grad_log(x,self.bdry,self.my)
                 return res
-            
+
+            # store the grad-function in options
             self.options['grad']= grad_total
-            ########
 
             # for benchmark
             self.kwargs['jac'] = grad_total
 
-            #################Iteration over different my's
             xk_1 = x0
             xk   = x0
-            for i in range(15): #max amount of different my's
+            while (1):
+                # update iteration number
+                iterNum += 1
                 print('\nxk =')
                 print(xk)
+
+                # find local minimizer of for the barrier method
                 res = minimize(lambda x: self.func(x) - self.my*numpy.sum(
                                          my_log(eval_c(x,self.bdry))),
                                x0=xk, 
@@ -192,26 +232,38 @@ class ProjectScipyBackend(Backend):
                                method=self.optimize_func,
                                options=self.options, 
                                **self.kwargs)
+                # update xk
                 xk = res.x
-                #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
+                
+                # why do you need this line?
                 normneu = numpy.linalg.norm(xk)
-                print('\nmeritwert')
-                print(self.func(xk))
-                if numpy.absolute(numpy.linalg.norm(xk-xk_1))<tol_seq :
-                    print('\n\n\
-                           ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
-                    print(i)
+
+                print('\nx_k =')
+                print(res.x)
+                print('\nmeritfunction(x_k) =')
+                print(self.func(res.x))
+                if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
+                    print('\n---------- end of log barrier run----------')
+                    print('\nTerminated in iteration = ')
+                    print(iterNum)
+                    print('\n||h(x)||_inf = ')
+                    print(numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf))
                     break
+                else: # xk is not in the feasible set -> update my
+                    # update my
+                    self.my = self.my/10
 
-                xk_1 = xk                          #update resalt
-
-                self.my = self.my/10               #update my
-            ##############
+                # update xk-1
+                xk_1 = xk
 
         else:
             print('Methodparam not found!')
             sys.exit()
 
+        print('\nx_final =')
+        print(res.x)
+        print('\nmeritfunction(x_final) =')
+        print(self.func(res.x))
         self.res = res
         return res.x
 
