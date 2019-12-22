@@ -16,7 +16,8 @@ class ProjectScipyBackend(Backend):
         self.options       = options
         self.methodparam   = methodparam
         self.kwargs        = kwargs
-        self.tau0          = tau0
+        self.tauk          = tau0
+        self.lamk          = 0.
         # self.func=MeritFunctionWrapper is set within the Optimizer __init__ 
 
     def update_PSB(self, optimi) :
@@ -37,7 +38,7 @@ class ProjectScipyBackend(Backend):
 
         if (self.methodparam == 'standard'):
             print('----------------- run standard -----------------')
-            print('\nx0 in run =')
+            print('\nx0 =')
             print(x0)
 
             #No Penalty, no Lagrange terms
@@ -66,37 +67,38 @@ class ProjectScipyBackend(Backend):
             self.kwargs['jac'] = grad_total
             
             #################Iteration over different Tau's
-            xalt = x0
+            xk_1 = x0
+            xk   = x0
             for i in range(15): #max amount of different tau's
                 print('\nx_k =')
                 print(xk)
                 print('\nbdry =')
                 print(self.bdry)
                 print('\ntau =')
-                print(self.tau0)
+                print(self.tauk)
                 print('\ngradient of the penalty term')
-                print(grad_pen(x0,self.bdry, self.tau0))
+                print(grad_pen(xk,self.bdry, self.tauk))
                 res = minimize(lambda x: self.func(x) +
-                                        0.5*self.tau0*numpy.square(
+                                        0.5*self.tauk*numpy.square(
                                         numpy.linalg.norm(eval_h(x,self.bdry))), 
-                               x0=x0, 
+                               x0=xk, 
                                args=(), 
                                method=self.optimize_func,
                                options=self.options, 
                                **self.kwargs)
-                x0 = res.x
+                xk = res.x
                 #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
-                print('meritwert')
-                print(self.func(x0))
-                if numpy.absolute(numpy.linalg.norm(x0-xalt))<tol_seq :
+                print('\nmeritwert=')
+                print(self.func(xk))
+                if numpy.absolute(numpy.linalg.norm(xk-xk_1))<tol_seq :
                     print('\n\n\
                            ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
                     print(i)
                     break
 
-                xalt = x0                               #update resalt
+                xk_1 = xk  # update resalt
                 
-                self.tau0 = 7*self.tau0 #update tau
+                self.tauk = 7*self.tauk #update tau
             ##############
         
         
@@ -104,12 +106,12 @@ class ProjectScipyBackend(Backend):
             #Both, Penalty and Lagrange Term
             print('----------------- run penalty lagrange -----------------')
 
-            self.lam = 0.333*numpy.ones(2*len(x0))
+            self.lamk = 0.333*numpy.ones(2*len(x0))
             ########DEFINE GRADIENT###########
             def grad_total(x):
                 h = 0.0000001
-                res = grad(self.fun, x, h) +\
-                            grad_lag(x,self.bdry,self.tau0,self.lam)
+                res = grad(self.func, x, h) +\
+                            grad_lag(x,self.bdry,self.tauk,self.lamk)
                 return res
             
             self.options['grad']= grad_total
@@ -119,34 +121,43 @@ class ProjectScipyBackend(Backend):
             self.kwargs['jac'] = grad_total
 
             #################Iteration over different Tau's
-            xalt = x0
+            xk_1 = x0
+            xk   = x0
             for i in range(15): #max amount of different tau's
-                print('x0 in run =')
-                print(x0)
+                print('\nx_k =')
+                print(xk)
+                print('\nbdry =')
+                print(self.bdry)
+                print('\ntau_k =')
+                print(self.tauk)
+                print('\nlambda_k =')
+                print(self.lamk)
+                print('\ngradient of the penalty term')
+                print(grad_pen(xk,self.bdry, self.tauk))
                 res = minimize(lambda x: self.func(x) +
-                                        0.5*self.tau0*numpy.square(
+                                        0.5*self.tauk*numpy.square(
                                         numpy.linalg.norm(eval_h(x,self.bdry)))
                                         + 
-                                        numpy.dot(self.lam,eval_h(x,self.bdry)), 
-                               x0=x0, 
+                                        numpy.dot(self.lamk,eval_h(x,self.bdry)),
+                               x0=xk, 
                                args=(), 
                                method=self.optimize_func,
                                options=self.options, 
                                **self.kwargs)
-                x0 = res.x
+                xk = res.x
                 #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
                 print('meritwert')
-                print(self.func(x0))
-                if numpy.absolute(numpy.linalg.norm(x0-xalt))<tol_seq :
+                print(self.func(xk))
+                if numpy.absolute(numpy.linalg.norm(xk-xk_1))<tol_seq :
                     print('\n\n\
                            ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
                     print(i)
                     break
 
-                xalt = x0                               #update resalt
-                self.lam = numpy.add(self.lam, self.tau0*eval_h(x0, self.bdry))
+                xk_1 = xk                               #update resalt
+                self.lamk = numpy.add(self.lamk, self.tauk*eval_h(xk, self.bdry))
                                                         #update lam
-                self.tau0 = 7*self.tau0                 #update tau
+                self.tauk = 7*self.tauk                 #update tau
             ##############
         
         elif (self.methodparam == 'log'):
@@ -158,8 +169,8 @@ class ProjectScipyBackend(Backend):
             ########DEFINE GRADIENT###########
             def grad_total(x):
                 h = 0.0000001
-                res = grad(self.fun, x, h) -\
-                            grad_log(x,self.bdry,self.my)
+                res = grad(self.func, x, h) -\
+                           grad_log(x,self.bdry,self.my)
                 return res
             
             self.options['grad']= grad_total
@@ -169,29 +180,30 @@ class ProjectScipyBackend(Backend):
             self.kwargs['jac'] = grad_total
 
             #################Iteration over different my's
-            xalt = x0
+            xk_1 = x0
+            xk   = x0
             for i in range(15): #max amount of different my's
-                print('x0 in run =')
-                print(x0)
+                print('\nxk =')
+                print(xk)
                 res = minimize(lambda x: self.func(x) - self.my*numpy.sum(
-                                                my_log(eval_c(x,self.bdry))),
-                               x0=x0, 
+                                         my_log(eval_c(x,self.bdry))),
+                               x0=xk, 
                                args=(), 
                                method=self.optimize_func,
                                options=self.options, 
                                **self.kwargs)
-                x0 = res.x
+                xk = res.x
                 #ABBRUCHBEDINGUNG, wie waehlt man tol?!?!?!?!?!
-                normneu = numpy.linalg.norm(x0)
-                print('meritwert')
-                print(self.func(x0))
-                if numpy.absolute(numpy.linalg.norm(x0-xalt))<tol_seq :
+                normneu = numpy.linalg.norm(xk)
+                print('\nmeritwert')
+                print(self.func(xk))
+                if numpy.absolute(numpy.linalg.norm(xk-xk_1))<tol_seq :
                     print('\n\n\
                            ***ABBRUCH DER OPTIMIERUNGSSEQUENZ***\n\n')
                     print(i)
                     break
 
-                xalt = x0                          #update resalt
+                xk_1 = xk                          #update resalt
 
                 self.my = self.my/10               #update my
             ##############
