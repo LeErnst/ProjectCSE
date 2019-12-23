@@ -49,7 +49,8 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      SimulatedAnnealingBackend)
 from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
-                                       sgd)
+                                       sgd,
+                                       gradient_descent)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -118,7 +119,7 @@ numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength, 
-                                    whichmeritfunc='sgd', 
+                                    whichmeritfunc='standard', 
                                     error='error2')
 
 
@@ -159,19 +160,23 @@ def osupdate(my_s):
 
 # ----- choose the backend
 
-# opt_backend = ScipyBackend(method='Nelder-Mead',
-#                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
-
-
 
 #*******************************************************************************
 #****ALS FUNKTION AUSLAGERN???**************************************************
 #*******************************************************************************
 # choose our own backend for testing some algos
-opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,
-                                  methodparam=2,
-                                  options={'maxiter': 100, 'xatol': 1e-5,\
-                                           'fatol': 1e-5})
+
+# possible methodparams = {standard, penalty, penalty-lagrange, log}
+
+# for problems increase the stepsize
+opt_backend = ProjectScipyBackend(optimize_func=gradient_descent,
+                                  methodparam='penalty-lagrange',
+                                  options={})
+
+#opt_backend = ProjectScipyBackend(optimize_func='nelder-mead',#test_minimize_neldermead,
+#                                  methodparam='penalty-lagrange',
+#                                  options={'maxiter': 50 , 'xatol': 1e-5,\
+#                                           'fatol': 1e-5})
 
 # ----- create optimizer object
 optimi = Optimizer(s,

@@ -1,4 +1,5 @@
-# aux functions by lewin
+# aux functions 
+from __future__ import print_function
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -571,4 +572,29 @@ def my_log(x) :
             cnt = cnt + 1
 
     return res
+
+def printArray(name, x, typ='float', point=3):                                   
+    '''
+    point is the number of digits after the point
+    '''
+    x = np.asarray(x)
+
+    if (typ == 'float'):
+        style = '{:0.'+str(point)+'f}'
+        np.set_printoptions(formatter={typ: style.format})
+    elif (typ == 'int'):
+        x = np.array(x, dtype=int)
+        np.set_printoptions(formatter={typ: '{:d}'.format})
+    elif (typ == 'bool'):
+        np.set_printoptions(formatter={typ: '{:b}'.format})
+    else:
+        style = '{:0.3f}'
+        np.set_printoptions(formatter={typ: style.format})
+    print('\n', end='')
+    print(name, end=' ')
+    print(x, end='')
+    print('\n')
+
+
+
 

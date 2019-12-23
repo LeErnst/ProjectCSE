@@ -1,3 +1,4 @@
+from __future__ import print_function
 import math
 import random
 import numpy
@@ -7,7 +8,7 @@ from scipy.optimize import OptimizeResult
 from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
 from derivatives import grad, grad_pen, grad_lag, grad_log
-from auxiliary_functions import get_bdry, eval_h, eval_c, my_log
+from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=1.0,
@@ -29,8 +30,7 @@ class ProjectScipyBackend(Backend):
         '''
 
         self.bdry = get_bdry(optimi)
-        print('\nbdry in ProjectScipyBackend:')
-        print(self.bdry)
+        printArray('bdry in ProjectScipyBackend = ', self.bdry)
     
     def run(self, x0):
         # tolerance for the infeasibility measurement 
@@ -39,11 +39,11 @@ class ProjectScipyBackend(Backend):
         iterNum = 0
         # h for the gradient
         h = 1e-8
+        # number of digits after the point of xk
+        points = 7
         
-        print('\nx0 =')
-        print(x0)
-        print('\nmeritfunction(x_0) =')
-        print(self.func(x0))
+        printArray('x0 =', x0, point=points)
+        print('\nmeritfunction(x_0) = %10.6f' % (self.func(x0)))
 
         if (self.methodparam == 'standard'):
 
@@ -81,20 +81,19 @@ class ProjectScipyBackend(Backend):
  
                 # update iteration number
                 iterNum += 1
-                print('\niteration number =')
-                print(iterNum)
-                print('\nbdry =')
-                print(self.bdry)
-                print('\ntau =')
-                print(self.tauk)
-                print('\ngradient of the penalty term')
-                print(grad_pen(xk,self.bdry, self.tauk))
+                print('\niteration number = %d' % (iterNum))
+                printArray('bdry =', self.bdry)
+                print('\ntau = %6.3f' % (self.tauk))
+                printArray('gradient of the penalty term =',\
+                           grad_pen(xk,self.bdry, self.tauk))
 
                 # find local minimizer of 
                 # meritfunction(x) + 0.5*tau_k*||h(x)||_2^2
-                res = minimize(lambda x: self.func(x) +
-                                        0.5*self.tauk*numpy.square(
-                                        numpy.linalg.norm(eval_h(x,self.bdry))), 
+                penalty_func = lambda x: self.func(x) +\
+                                        0.5*self.tauk*numpy.square(\
+                                        numpy.linalg.norm(eval_h(x,self.bdry)))
+                
+                res = minimize(penalty_func,
                                x0=xk, 
                                args=(), 
                                method=self.optimize_func,
@@ -103,18 +102,15 @@ class ProjectScipyBackend(Backend):
                 # update xk
                 xk = res.x
 
-                print('\nx_k =')
-                print(res.x)
-                print('\nmeritfunction(x_k) =')
-                print(self.func(res.x))
+                printArray('x_k =', res.x, point=points)
+                print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
                 if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
                     print('\n----------- end of penalty run -----------')
-                    print('\nTerminated in iteration = ')
-                    print(iterNum)
-                    print('\n||h(x)||_inf = ')
-                    print(numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf))
+                    print('\nTerminated in iteration = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
                 else: # xk is not in the feasible set -> update tauk
                     # update tau
@@ -151,29 +147,23 @@ class ProjectScipyBackend(Backend):
 
                 # update iteration number
                 iterNum += 1
-                print('\niteration number =')
-                print(iterNum)
-                print('\nbdry =')
-                print(self.bdry)
-                print('\ntau_k =')
-                print(self.tauk)
-                print('\nlambda_k =')
-                print(self.lamk)
-                print('\ngradient of the penalty-lambda term')
-                print(grad_pen(xk,self.bdry, self.tauk))
 
-                print("\ndebugging in project_optimize_backends.py line 164\n")
-                # calculate the gradient manually
-                print(self.func(xk+1e-8), self.func(xk-1e-8))
-                print((self.func(xk+1e-8)-self.func(xk-1e-8))/(2*1e-8))
+                print('\niteration number = %d' % (iterNum))
+                printArray('bdry =', self.bdry)
+                print('\ntau = %6.3f' % (self.tauk))
+                printArray('lambda_k =', self.lamk)
+                printArray('gradient of the penalty term =',\
+                           grad_lag(xk,self.bdry, self.tauk, self.lamk))
+
 
                 # find local minimizer of 
                 # meritfunction(x) + (lambda_k)^T h(x) + 0.5*tau_k*||h(x)||_2^2
-                res = minimize(lambda x: self.func(x) +
-                                        0.5*self.tauk*numpy.square(
-                                        numpy.linalg.norm(eval_h(x,self.bdry)))
-                                        + 
-                                        numpy.dot(self.lamk,eval_h(x,self.bdry)),
+                penalty_lag_func = lambda x: self.func(x) +\
+                                       0.5*self.tauk*numpy.square(\
+                                       numpy.linalg.norm(eval_h(x,self.bdry)))+\
+                                       numpy.dot(self.lamk,eval_h(x,self.bdry))
+
+                res = minimize(penalty_lag_func,
                                x0=xk, 
                                args=(), 
                                method=self.optimize_func,
@@ -182,18 +172,15 @@ class ProjectScipyBackend(Backend):
                 # update xk
                 xk = res.x
 
-                print('\nx_k=')
-                print(res.x)
-                print('\nmeritfunction(x_k) =')
-                print(self.func(res.x))
+                printArray('x_k =', res.x, point=points)
+                print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
                 if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
                     print('\n---------- end of penalty lagrange run ----------')
-                    print('\nTerminated in iteration = ')
-                    print(iterNum)
-                    print('\n||h(x)||_inf = ')
-                    print(numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf))
+                    print('\nTerminated in iteration = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
                 else: # xk is not in the feasible set -> update tauk and lambdak
                     # update tau
@@ -229,12 +216,13 @@ class ProjectScipyBackend(Backend):
 
                # update iteration number
                 iterNum += 1
-                print('\niteration number =')
-                print(iterNum)
+                print('\niteration number = %d' % (iterNum))
 
                 # find local minimizer of for the barrier method
-                res = minimize(lambda x: self.func(x) - self.my*numpy.sum(
-                                         my_log(eval_c(x,self.bdry))),
+                log_func = lambda x: self.func(x) - self.my*numpy.sum(\
+                                     my_log(eval_c(x,self.bdry)))
+
+                res = minimize(log_func,
                                x0=xk, 
                                args=(), 
                                method=self.optimize_func,
@@ -246,18 +234,15 @@ class ProjectScipyBackend(Backend):
                 # why do you need this line?
                 normneu = numpy.linalg.norm(xk)
 
-                print('\nx_k =')
-                print(res.x)
-                print('\nmeritfunction(x_k) =')
-                print(self.func(res.x))
+                printArray('x_k =', res.x, point=points)
+                print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
                 if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
                     print('\n---------- end of log barrier run----------')
-                    print('\nTerminated in iteration = ')
-                    print(iterNum)
-                    print('\n||h(x)||_inf = ')
-                    print(numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf))
+                    print('\nTerminated in iteration = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
                 else: # xk is not in the feasible set -> update my
                     # update my
@@ -270,10 +255,8 @@ class ProjectScipyBackend(Backend):
             print('Methodparam not found!')
             sys.exit()
 
-        print('\nx_final =')
-        print(res.x)
-        print('\nmeritfunction(x_final) =')
-        print(self.func(res.x))
+        printArray('x_k =', res.x, point=points)
+        print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
         self.res = res
         return res.x
 
@@ -339,12 +322,14 @@ def gradient_descent(func, x0, args=(),
     while (iternum < maxiter):
         iternum += 1
         xk -= stepsize*grad(xk)
-        if (numpy.linalg.norm(grad(xk), numpy.inf) < 1e-8):
-            print('gradient is near zero')
+        if (numpy.linalg.norm(grad(xk), numpy.inf) < 1e-1):
+            print('\ngradient is near zero\n')
+            print('||grad(x_final)||_inf = %10.6'\
+                  % (numpy.linalg.norm(grad(xk), numpy.inf)))
+            print('\nTerminated in iteration: %d' % (iternum))
             break
 
-    print("\ngradient in gradient decsent for x_final = ")
-    print(grad(xk))
+    printArray('gradient in gradient decsent for x_final = ', grad(xk))
     return OptimizeResult(fun=func(xk), x=xk, nit=iternum)
 
 def test_minimize_neldermead(func, x0, args=(), 
