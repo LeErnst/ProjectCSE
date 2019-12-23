@@ -49,6 +49,7 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      SimulatedAnnealingBackend)
 from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
+                                       gradient_descent,
                                        sgd)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
@@ -66,6 +67,8 @@ from auxiliary_functions import calculateRayPaths,\
                                 inout,\
                                 plotSpotDia, \
                                 get_bdry
+                                
+from benchmark          import benchmark
 # --- meritfunction and initialbundle
 from aux_merit_bundle import buildInitialbundle, get_bundle_merit
 
@@ -163,6 +166,17 @@ def osupdate(my_s):
 #                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
 
 
+# BENCHMARKING:
+methods = [ ["Nelder-Mead","penalty"],\
+            [test_minimize_neldermead,"penalty"], \
+            ["CG","penalty-lagrange"],\
+            ["BFGS","penalty-lagrange"],\
+            ["TNC","standard"],\
+            ["L-BFGS-B","standard"],\
+            ["SLSQP","standard"],\
+            [gradient_descent,"penalty","penalty-lagrange"] ]
+
+benchmark(s,meritfunctionrms,osupdate,methods)
 """
 #*******************************************************************************
 #****ALS FUNKTION AUSLAGERN???**************************************************
