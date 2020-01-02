@@ -59,15 +59,15 @@ def get_stochastic_grad(optimi, rays_dict, wavelength, numrays, initialbundle,
         # draw a number from the range [0, sample_range-1] (it is an array-index)
         sample_num = random.randint(0, sample_range-1)
 
-        # set the meritparams in Optimizer-class, such that the meritfunctionrms can
-        # figure out which initialbundle has been drawn
-        optimi.meritparameters = {"sample_num": sample_num}
-        func = optimi.MeritFunctionWrapper
+        # set the meritparams in Optimizer-class, such that the meritfunctionrms
+        # can figure out which initialbundle has been drawn
+        optimi.meritparameters['sample_num'] = sample_num
 
         # calculate the stochastic gradient
         for i in range(dim):
             sgrad[i] = (func(x+h*E[i,:]) - func(x-h*E[i,:]))/(2*h)
 
+        optimi.meritparameters = {}
 
         return sgrad
     

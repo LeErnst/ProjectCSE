@@ -102,7 +102,7 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
     # a special meritfunc.
 
     # ---------------standard meritfunction
-    def meritfunctionrms_standard(my_s):
+    def meritfunctionrms_standard(my_s, **kwargs):
         """
         Standard meritfunctionrms: 
         """
@@ -136,32 +136,30 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
     # ---------------sgd meritfunction
     wavel = len(wavelength)
-    def meritfunctionrms_sgd(my_s, **args):
-        if (len(args) == 0):
-#            sample_initialbundle = initialbundle
-#            print("args = 0 ")
+    def meritfunctionrms_sgd(my_s, **kwargs):
+        if (len(kwargs) == 0):
+            #print('kwargs = 0')
             return meritfunctionrms_standard(my_s)
         else:
+            #print('kwargs != 0')
             res = 0
-            sample_num = args["sample_num"]
-            print(sample_num)
+            sample_num = kwargs['sample_num']
+
             # choose the sampled bundle
             if (sample_param == 'bundle'):
                 sample_initialbundle = initialbundle[sample_num]
-                forrange = len(sample_initialbundle)
             if (sample_param == 'wave'):
-                sample_initialbundle = initialbundle[sample_num//wavel]\
-                                                    [sample_num%wavel]
-                forrange = 1
+                sample_initialbundle = [initialbundle[sample_num//wavel]\
+                                                     [sample_num%wavel]]
             if (sample_param == 'ray'):
                 pass #TODO: this seems to be a little bit tricky, but i expect a 
                      #      bad solution anyway
  
             # Loop over sample_initialbundle
-            for i in range(0, forrange):
+            for i in range(0, len(sample_initialbundle)):
                 x = []
                 y = []
-                rpaths = my_s.seqtrace(sample_initialbundle, sysseq)
+                rpaths = my_s.seqtrace(sample_initialbundle[i], sysseq)
  
                 # append x and y for each bundle
                 x.append(rpaths[0].raybundles[-1].x[-1, 0, :])
@@ -176,7 +174,7 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                     res += error2squared(x, xmean, y, ymean)
                 elif (error == 'error1'):
                     res += error1(x, xmean, y, ymean)
- 
+
             return res
 
     # for defining which meritfunction should be used

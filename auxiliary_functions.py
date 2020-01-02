@@ -17,7 +17,6 @@ from pyrateoptics.sampling2d                            import raster
 from pyrateoptics.raytracer.ray                         import RayPath
 from pyrateoptics.raytracer.ray                         import RayBundle
 
-
 #---------------------------------------
 #Writes data to a file
 #---------------------------------------
@@ -27,6 +26,7 @@ from pyrateoptics.raytracer.material.material_glasscat import\
 import matplotlib.pyplot as plt 
 import os
 import sys
+
 '''
 This class is for storing and printing the optimization results
 Have a look at the readme file if you want more informations how 
@@ -333,11 +333,6 @@ def str_to_class(classname):
     return getattr(sys.modules[__name__], classname)
 
 
-
-
-
-
-
 def error2squared(x, x_ref, y, y_ref, penalty=False):
     '''
     computes the squared
@@ -596,5 +591,20 @@ def printArray(name, x, typ='float', point=3):
     print('\n')
 
 
+def termcondition_descdir(gradient, gradtol=1e-8):
+    dim = len(gradient)
+    E = np.eye(dim,dim)
+    ismin = True
+    for i in range(dim):
+        if (ismin):
+            if (np.dot(E[i,:],gradient) < 0):
+                ismin = False
+            if (np.dot(-E[i,:],gradient) < 0):
+                ismin = False
+
+#    if (np.linalg.norm(gradient, np.inf) >= gradtol):
+#        ismin = False
+
+    return ismin
 
 

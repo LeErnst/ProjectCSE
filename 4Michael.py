@@ -121,7 +121,7 @@ numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength, 
-                                    whichmeritfunc='sgd', 
+                                    whichmeritfunc='standard', 
                                     error='error2')
 
 

@@ -7,19 +7,22 @@ from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
 from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
-from derivatives import grad, grad_pen, grad_lag, grad_log
-from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray
+from derivatives import grad, grad_pen, grad_lag, grad_log, hessian
+from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
+                                termcondition_descdir
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=1.0,
-                 options={}, **kwargs):
-        self.optimize_func = optimize_func
-        self.options       = options
-        self.methodparam   = methodparam
-        self.kwargs        = kwargs
-        self.tauk          = tau0
-        self.lamk          = 1.
-        # self.func=MeritFunctionWrapper is set within the Optimizer __init__ 
+                 options={}, stochagradparam=False, **kwargs):
+        self.optimize_func   = optimize_func
+        self.options         = options
+        self.methodparam     = methodparam
+        self.stochagradparam = stochagradparam
+        self.kwargs          = kwargs
+        self.tauk            = tau0
+        self.lamk            = 1.
+        self.stochagrad      = None
+        # self.func = MeritFunctionWrapper is set within the Optimizer __init__ 
 
     def update_PSB(self, optimi) :
         '''
@@ -70,8 +73,12 @@ class ProjectScipyBackend(Backend):
             while (1): 
                 # define the gradient for the penalty method
                 def grad_total(x):
-                    res = grad(self.func, x, h) +\
-                          grad_pen(x,self.bdry,self.tauk)
+                    if (self.stochagradparam == True):
+                        res = self.stochagrad(self.func, x, h) + \
+                              grad_pen(x,self.bdry,self.tauk)
+                    else: # this is the default case
+                        res = grad(self.func, x, h) + \
+                              grad_pen(x,self.bdry,self.tauk)
                     return res
                 # store the grad-function in options
                 self.options['grad'] = grad_total
@@ -135,8 +142,12 @@ class ProjectScipyBackend(Backend):
              
                 # define the gradient for the penalty-lagrange-function
                 def grad_total(x):
-                    res = grad(self.func, x, h) +\
-                          grad_lag(x,self.bdry,self.tauk,self.lamk)
+                    if (self.stochagradparam == True):
+                        res = self.stochagrad(self.func, x, h) + \
+                              grad_lag(x,self.bdry,self.tauk,self.lamk)
+                    else: # this is the default case
+                        res = grad(self.func, x, h) + \
+                              grad_lag(x,self.bdry,self.tauk,self.lamk)
                     return res
             
                 # store the grad-function in options
@@ -204,10 +215,14 @@ class ProjectScipyBackend(Backend):
             while (1):
                 # define the gradient for the log-barrier method
                 def grad_total(x):
-                    res = grad(self.func, x, h) -\
-                          grad_log(x,self.bdry,self.my)
+                    if (self.stochagradparam == True):
+                        res = self.stochagrad(self.func, x, h) - \
+                              grad_log(x,self.bdry,self.my)
+                    else: # this is the default case
+                        res = grad(self.func, x, h) - \
+                              grad_log(x,self.bdry,self.my)
                     return res
-
+ 
                 # store the grad-function in options
                 self.options['grad']= grad_total
 
@@ -262,8 +277,10 @@ class ProjectScipyBackend(Backend):
 
 
 def sgd(func, x0, args, 
-        gradient=None, maxiter=250, fatol=1e-4,
-        stepsize=1e-3, h=1e-6, **unknown_options):
+        maxiter=500,
+        stepsize=1e-8, 
+        h=1e-8, 
+        gradtol=1e-3, **kwargs):
     """
     maxiter: int
         Maximum allowed number of iterations.
@@ -275,48 +292,31 @@ def sgd(func, x0, args,
     stepsize: number
         Size of step between iterations.
     """
-    if (gradient == None):
-        print("stochastic_grad is None")
-        gradient = grad
-    else:
-        print("stochastic_grad is not None")
-    
-    print(x0)
-    termcond = grad
+
+    gradient = kwargs['grad']
+    # ismin = termcondition_descdir(grad(func, x0, h), gradtol)
     xopt = x0
-    xtemp = x0
-    # path = numpy.array([x0])
-    iterNum = 1
-    iterTolf = fatol + 1
-    # as a termination condition one could think of the real gradient and the
-    # hessian matrix
-    # another extension could be the escaping of a local minimum, like:
-    # 1. detect the lokal minimum with the gradient and the hessian
-    # 2. escape by making more steps with the stochastic gradient until another
-    #    local minimum is reached
-    tol = 1e-1
-    while ((iterNum < maxiter) and (tol < numpy.linalg.norm(termcond(func,xopt,h)))):# and (fatol < iterTolf)):
+    iterNum = 0
+    ismin = False
+
+    if (numpy.linalg.norm(grad(func, xopt, h), numpy.inf) < gradtol):
+        ismin = True
+
+    while ((iterNum < maxiter) and not ismin):
         # iteration rule
-        xopt -= stepsize*gradient(func, xopt, h=1e-6) 
-
-        # print(xopt)
-
-        # append the value to the path
-        # numpy.append(path, [xopt], axis=0)
-        # update the termination condition
-        print(iterNum)
+        xopt -= stepsize*gradient(xopt) 
         iterNum += 1
-        # -----------------debugging
-        iterTolf = numpy.absolute(func(xopt)-func(xtemp))
-        # update xtemp
-        xtemp = xopt
+        if (numpy.linalg.norm(grad(func, xopt, h), numpy.inf) < gradtol):
+            ismin = True
+        # ismin = termcondition_descdir(grad(func, xopt, h), gradtol)
 
     return OptimizeResult(fun=func(xopt), x=xopt, nit=iterNum)
 
+
 def gradient_descent(func, x0, args=(),
-                     maxiter=100, stepsize=1e-8, **unkown_options):
+                     maxiter=100, stepsize=1e-8, **kwargs):
     xk = x0
-    grad = unkown_options['grad']
+    grad = kwargs['grad']
     iternum = 0 
 
     while (iternum < maxiter):

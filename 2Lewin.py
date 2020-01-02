@@ -112,14 +112,16 @@ osa = OpticalSystemAnalysis(s, sysseq)
 
 
 # III ----------- defining raybundles for optimization and plotting 
-rays_dict=fi1.get_rays_dict()
-#TODO In Landos code noch wavelength and numrays einpflegen
-wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
-numrays = 10
+# rays_dict = fi1.get_rays_dict()
+
+rays_dict = {"startz":[-8], "starty": [0], "radius": [8],
+             "anglex": [0.03, -0.05], "rasterobj":raster.RectGrid()}
+wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
+numrays = 25
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength, 
-                                    whichmeritfunc='standard', 
+                                    whichmeritfunc='sgd', 
                                     error='error2')
 
 
@@ -147,10 +149,6 @@ plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 fi1.setup_variables(s,elem1.name)
 #######################################NeuEnde##################################
 
-# --- print table of optimizable variables
-# this is actually quite nice to get a look at the vars, especially at the end
-print("listedervariablen")
-listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 
 # --- define update function
 def osupdate(my_s):
@@ -158,25 +156,29 @@ def osupdate(my_s):
     my_s.rootcoordinatesystem.update()
 
 
-# ----- choose the backend
-
-
-#*******************************************************************************
-#****ALS FUNKTION AUSLAGERN???**************************************************
 #*******************************************************************************
 # choose our own backend for testing some algos
 
 # possible methodparams = {standard, penalty, penalty-lagrange, log}
 
+# ---- gradient descent
 # for problems increase the stepsize
-opt_backend = ProjectScipyBackend(optimize_func=gradient_descent,
-                                  methodparam='penalty-lagrange',
-                                  options={})
+#opt_backend = ProjectScipyBackend(optimize_func=gradient_descent,
+#                                  methodparam='penalty-lagrange',
+#                                  options={})
 
-#opt_backend = ProjectScipyBackend(optimize_func='nelder-mead',#test_minimize_neldermead,
+# ---- own neldermead
+#opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,
 #                                  methodparam='penalty-lagrange',
 #                                  options={'maxiter': 50 , 'xatol': 1e-5,\
 #                                           'fatol': 1e-5})
+
+# ---- stochastic gradient descent
+opt_backend = ProjectScipyBackend(optimize_func=sgd,
+                                  methodparam='penalty-lagrange',
+                                  stochagradparam=True,
+                                  options={'maxiter': 10000, 'stepsize': 1e-8})
+
 
 # ----- create optimizer object
 optimi = Optimizer(s,
@@ -184,19 +186,17 @@ optimi = Optimizer(s,
                    backend=opt_backend,
                    updatefunction=osupdate)
 
-#bdry = get_bdry(optimi)
-
-#Warum dreimal?!?
-fi1.store_data(s)   #bei jedem aufruf werden die variablen gespeichert
 fi1.store_data(s)
-fi1.store_data(s)
-fi1.write_to_file() #am ende einmal in ne datei schreiben
+fi1.write_to_file()
 
-## ----- start optimizing
+# ----- start optimizing
 opt_backend.update_PSB(optimi)
+
+stochagrad = get_stochastic_grad(optimi, rays_dict, wavelength, numrays, 
+                                 initialbundle, sample_param="wave")
+opt_backend.stochagrad = stochagrad
+
 s = optimi.run()
-#*******************************************************************************
-#*******************************************************************************
 #*******************************************************************************
 
 
