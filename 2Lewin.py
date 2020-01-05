@@ -115,14 +115,21 @@ osa = OpticalSystemAnalysis(s, sysseq)
 # rays_dict = fi1.get_rays_dict()
 
 rays_dict = {"startz":[-8], "starty": [0], "radius": [8],
-             "anglex": [0.03, -0.05], "rasterobj":raster.RectGrid()}
+             "anglex": [0.05, 0.025, 0., -0.025, -0.05], 
+             "rasterobj":raster.RectGrid()}
 wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
-numrays = 25
+numrays = 50
+sample_param = 'bundle'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
-                                    numrays, wavelength, 
-                                    whichmeritfunc='sgd', 
-                                    error='error2')
+                                                     numrays, wavelength, 
+                                                     whichmeritfunc='sgd', 
+                                                     error='error2',
+                                                     sample_param=sample_param)
+#mask = np.zeros(44, dtype=bool)
+#mask[5] = True
+#print(initialbundle[0][0].x.shape)
+#sys.exit()
 
 
 # ----- plot the original system
@@ -141,7 +148,6 @@ ax2.axis('equal')
 # inside of the seqtrace function (called inside of plotBundles)
 testbundle = deepcopy(initialbundle)
 plotBundles(s, initialbundle, sysseq, ax1, pn, up)
-
 
 # IV ----------- optimization
 # ----- define optimizable variables
@@ -177,7 +183,7 @@ def osupdate(my_s):
 opt_backend = ProjectScipyBackend(optimize_func=sgd,
                                   methodparam='penalty-lagrange',
                                   stochagradparam=True,
-                                  options={'maxiter': 10000, 'stepsize': 1e-8})
+                                  options={})
 
 
 # ----- create optimizer object
@@ -192,8 +198,7 @@ fi1.write_to_file()
 # ----- start optimizing
 opt_backend.update_PSB(optimi)
 
-stochagrad = get_stochastic_grad(optimi, rays_dict, wavelength, numrays, 
-                                 initialbundle, sample_param="wave")
+stochagrad = get_stochastic_grad(optimi, initialbundle, sample_param=sample_param)
 opt_backend.stochagrad = stochagrad
 
 s = optimi.run()

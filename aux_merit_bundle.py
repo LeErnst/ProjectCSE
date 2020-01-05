@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import random
+import sys
 
 # --- optical system and raytracing
 from pyrateoptics.raytracer.optical_system              import OpticalSystem
@@ -93,7 +94,7 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
     initialbundle = buildInitialbundle(osa, s, sysseq, rays_dict, 
                                        numrays, wavelength)
-    
+
     # --- define meritfunctions:
     # You can add your meritfunctionsrms-implementation and then add it to 
     # the dictionary. If the string whichmeritfunc is not a key in the dict. the 
@@ -135,14 +136,18 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
         return res
 
     # ---------------sgd meritfunction
-    wavel = len(wavelength)
+    wavel   = len(initialbundle[0])
+    numrays = initialbundle[0][0].x.shape[2]
+
     def meritfunctionrms_sgd(my_s, **kwargs):
         if (len(kwargs) == 0):
-            #print('kwargs = 0')
             return meritfunctionrms_standard(my_s)
         else:
-            #print('kwargs != 0')
             res = 0
+            # the stochastic gradient function has to tell this function which 
+            # number has been drawn, because this function gets invoked more than
+            # two times to calculate the gradient and because of that one can not
+            # draw the random number within this function
             sample_num = kwargs['sample_num']
 
             # choose the sampled bundle
@@ -152,23 +157,35 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 sample_initialbundle = [initialbundle[sample_num//wavel]\
                                                      [sample_num%wavel]]
             if (sample_param == 'ray'):
-                pass #TODO: this seems to be a little bit tricky, but i expect a 
-                     #      bad solution anyway
- 
+                bundlenum = sample_num//(wavel*numrays)
+                wavenum   = (sample_num-wavel*numrays*bundlenum)//numrays
+                raynum    = sample_num-wavel*numrays*bundlenum-numrays*wavenum
+
+                sample_initialbundle = [initialbundle[bundlenum][wavenum]]
+                mask = np.zeros(numrays, dtype=bool)
+                mask[raynum] = True
+
             # Loop over sample_initialbundle
+            x = np.array([])
+            y = np.array([])
             for i in range(0, len(sample_initialbundle)):
-                x = []
-                y = []
+
+                # calculate the ray paths
                 rpaths = my_s.seqtrace(sample_initialbundle[i], sysseq)
- 
+
                 # append x and y for each bundle
-                x.append(rpaths[0].raybundles[-1].x[-1, 0, :])
-                y.append(rpaths[0].raybundles[-1].x[-1, 1, :])
+                x = np.append(x, rpaths[0].raybundles[-1].x[-1, 0, :])
+                y = np.append(y, rpaths[0].raybundles[-1].x[-1, 1, :])
  
                 # Add up all the mean values of the different wavelengths
                 xmean = np.mean(x)
                 ymean = np.mean(y)
- 
+
+                # if the sample parameter is ray only one ray has been drawn
+                if (sample_param == 'ray'):
+                    x = x[mask]
+                    y = y[mask]
+
                 # Choose error function
                 if (error == 'error2'):
                     res += error2squared(x, xmean, y, ymean)

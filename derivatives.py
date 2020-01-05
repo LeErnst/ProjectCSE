@@ -34,23 +34,18 @@ from auxiliary_functions import error2squared, error1, eval_h, eval_c
 
 
 
-def get_stochastic_grad(optimi, rays_dict, wavelength, numrays, initialbundle,
-                        sample_param="wave"):
-    wavel = len(wavelength)
+def get_stochastic_grad(optimi, initialbundle, sample_param='wave'):
+
+    wavel = len(initialbundle[0])
+    numrays = initialbundle[0][0].x.shape[2]
     # determine the range from which numbers can be drawn
-    sample_range = 1
-    rays_dict_keys = rays_dict.keys()
-    rays_dict_keys.remove("rasterobj")
+    sample_range = len(initialbundle)
 
-    for key in rays_dict_keys:
-        sample_range *= len(rays_dict[key])
-
-    if (sample_param == "wave"):
+    if (sample_param == 'wave'):
         sample_range *= wavel
 
-    if (sample_param == "ray"):
+    if (sample_param == 'ray'):
         sample_range *= wavel*numrays
-
 
     def stochastic_grad(func, x, h):
         dim = len(x)
@@ -67,6 +62,8 @@ def get_stochastic_grad(optimi, rays_dict, wavelength, numrays, initialbundle,
         for i in range(dim):
             sgrad[i] = (func(x+h*E[i,:]) - func(x-h*E[i,:]))/(2*h)
 
+        # reset the meritparams in Optimizer-class, such that the full merit-
+        # functionrms is evaluated
         optimi.meritparameters = {}
 
         return sgrad

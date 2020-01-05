@@ -568,7 +568,7 @@ def my_log(x) :
 
     return res
 
-def printArray(name, x, typ='float', point=3):                                   
+def printArray(name, x, typ='float', point=5):                                   
     '''
     point is the number of digits after the point
     '''
@@ -591,19 +591,35 @@ def printArray(name, x, typ='float', point=3):
     print('\n')
 
 
-def termcondition_descdir(gradient, gradtol=1e-8):
-    dim = len(gradient)
-    E = np.eye(dim,dim)
-    ismin = True
-    for i in range(dim):
-        if (ismin):
-            if (np.dot(E[i,:],gradient) < 0):
-                ismin = False
-            if (np.dot(-E[i,:],gradient) < 0):
-                ismin = False
+def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
+    '''
+    Termination condition for smooth problems out of 
+    Gill, Murray and Wright: Practical Optimization, S.305ff
+    fk      : function value at xk
+    fk_1    : function value at xk_1
+    xk      : k-th x value of the sequence
+    xk_1    : k-1-th x value of the sequence
+    gk      : the gradient at xk
+    thetaf  : tolerance
+    p       : for the p-norm
+    '''
+    
+    ismin = False
+    phi     = thetaf*(1+np.absolute(fk))
+    epsilon = math.pow(thetaf, 1/2)*(1+np.linalg.norm(xk, p))
+    delta   = math.pow(thetaf, 1/3)*(1+np.absolute(fk))
 
-#    if (np.linalg.norm(gradient, np.inf) >= gradtol):
-#        ismin = False
+    print('fk      = %7.4f' %(fk))
+    printArray('gk      =\n', gk)
+    
+    # In the literature it is not the absolute value of fk_1-fk, but for 
+    # algorithm which does not go to a descent direction in every step the 
+    # absolute value is necessary
+    if ((np.absolute(fk_1-fk) < phi) and\
+        (np.linalg.norm(xk_1-xk, p) < epsilon) and\
+        (np.linalg.norm(gk, p) <= delta)):
+
+        ismin = True
 
     return ismin
 

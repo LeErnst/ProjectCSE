@@ -9,7 +9,7 @@ from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
 from derivatives import grad, grad_pen, grad_lag, grad_log, hessian
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
-                                termcondition_descdir
+                                termcondition
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=1.0,
@@ -72,14 +72,21 @@ class ProjectScipyBackend(Backend):
             xk   = x0
             while (1): 
                 # define the gradient for the penalty method
-                def grad_total(x):
-                    if (self.stochagradparam == True):
+                if (self.stochagradparam == True):
+                    def stochagrad_total(x):
                         res = self.stochagrad(self.func, x, h) + \
                               grad_pen(x,self.bdry,self.tauk)
-                    else: # this is the default case
+                        return res
+                    def grad_total(x):
                         res = grad(self.func, x, h) + \
                               grad_pen(x,self.bdry,self.tauk)
-                    return res
+                        return res
+                    self.options['stochagrad'] = stochagrad_total
+                else: # this is the default case
+                    def grad_total(x):
+                        res = grad(self.func, x, h) + \
+                              grad_pen(x,self.bdry,self.tauk)
+                        return res
                 # store the grad-function in options
                 self.options['grad'] = grad_total
 
@@ -141,15 +148,22 @@ class ProjectScipyBackend(Backend):
             while (1): 
              
                 # define the gradient for the penalty-lagrange-function
-                def grad_total(x):
-                    if (self.stochagradparam == True):
+                if (self.stochagradparam == True):
+                    def stochagrad_total(x):
                         res = self.stochagrad(self.func, x, h) + \
                               grad_lag(x,self.bdry,self.tauk,self.lamk)
-                    else: # this is the default case
+                        return res
+                    def grad_total(x):
                         res = grad(self.func, x, h) + \
                               grad_lag(x,self.bdry,self.tauk,self.lamk)
-                    return res
-            
+                        return res
+                    self.options['stochagrad'] = stochagrad_total
+                else: # this is the default case
+                    def grad_total(x):
+                        res = grad(self.func, x, h) + \
+                              grad_lag(x,self.bdry,self.tauk,self.lamk)
+                        return res
+
                 # store the grad-function in options
                 self.options['grad']= grad_total
             
@@ -213,16 +227,23 @@ class ProjectScipyBackend(Backend):
             xk_1 = x0
             xk   = x0
             while (1):
-                # define the gradient for the log-barrier method
-                def grad_total(x):
-                    if (self.stochagradparam == True):
-                        res = self.stochagrad(self.func, x, h) - \
+                # define the gradient for the penalty-lagrange-function
+                if (self.stochagradparam == True):
+                    def stochagrad_total(x):
+                        res = self.stochagrad(self.func, x, h) + \
                               grad_log(x,self.bdry,self.my)
-                    else: # this is the default case
-                        res = grad(self.func, x, h) - \
+                        return res
+                    def grad_total(x):
+                        res = grad(self.func, x, h) + \
                               grad_log(x,self.bdry,self.my)
-                    return res
- 
+                        return res
+                    self.options['stochagrad'] = stochagrad_total
+                else: # this is the default case
+                    def grad_total(x):
+                        res = grad(self.func, x, h) + \
+                              grad_log(x,self.bdry,self.my)
+                        return res
+
                 # store the grad-function in options
                 self.options['grad']= grad_total
 
@@ -277,40 +298,37 @@ class ProjectScipyBackend(Backend):
 
 
 def sgd(func, x0, args, 
-        maxiter=500,
-        stepsize=1e-8, 
-        h=1e-8, 
-        gradtol=1e-3, **kwargs):
-    """
-    maxiter: int
-        Maximum allowed number of iterations.
-    disp : bool
-        Set to True to print convergence messages.
-    fatol : number
-        Absolute error in func(xopt) between iterations that is acceptable for
-        convergence.
-    stepsize: number
-        Size of step between iterations.
-    """
+        maxiter=250,
+        stepsize=1e-9,
+        thetaf=1e-2,
+        p=None,
+        **kwargs):
 
     gradient = kwargs['grad']
-    # ismin = termcondition_descdir(grad(func, x0, h), gradtol)
-    xopt = x0
-    iterNum = 0
-    ismin = False
+    stochagrad = kwargs['stochagrad']
+    iternum = 0
+    xk_1 = x0
+    fk_1 = func(x0)
 
-    if (numpy.linalg.norm(grad(func, xopt, h), numpy.inf) < gradtol):
-        ismin = True
-
-    while ((iterNum < maxiter) and not ismin):
+    while (1):
         # iteration rule
-        xopt -= stepsize*gradient(xopt) 
-        iterNum += 1
-        if (numpy.linalg.norm(grad(func, xopt, h), numpy.inf) < gradtol):
-            ismin = True
-        # ismin = termcondition_descdir(grad(func, xopt, h), gradtol)
+#        xk = xk_1 - stepsize*stochagrad(xk_1) 
+        xk = xk_1 - stepsize*gradient(xk_1) 
+        fk = func(xk)
+        gk = gradient(xk)
 
-    return OptimizeResult(fun=func(xopt), x=xopt, nit=iterNum)
+        # termination
+        iternum += 1
+        ismin = termcondition(fk, fk_1, xk, xk_1, gk,
+                              thetaf,
+                              p)
+        printArray('stochastic gradient =\n', stochagrad(xk))
+        if ((ismin) or (iternum >= maxiter)):
+            break
+        xk_1 = xk
+        fk_1 = fk
+
+    return OptimizeResult(fun=fk, x=xk, nit=iternum)
 
 
 def gradient_descent(func, x0, args=(),
