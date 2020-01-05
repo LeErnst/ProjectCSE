@@ -610,7 +610,7 @@ def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
     delta   = math.pow(thetaf, 1/3)*(1+np.absolute(fk))
 
     print('fk      = %7.4f' %(fk))
-    printArray('gk      =\n', gk)
+#    printArray('gk      =\n', gk)
     
     # In the literature it is not the absolute value of fk_1-fk, but for 
     # algorithm which does not go to a descent direction in every step the 

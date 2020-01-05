@@ -50,7 +50,8 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
 from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
                                        sgd,
-                                       gradient_descent)
+                                       gradient_descent,
+                                       adam)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -180,11 +181,17 @@ def osupdate(my_s):
 #                                           'fatol': 1e-5})
 
 # ---- stochastic gradient descent
-opt_backend = ProjectScipyBackend(optimize_func=sgd,
+#opt_backend = ProjectScipyBackend(optimize_func=sgd,
+#                                  methodparam='penalty-lagrange',
+#                                  stochagradparam=True,
+#                                  options={})
+
+
+# ---- stochastic gradient descent
+opt_backend = ProjectScipyBackend(optimize_func=adam,
                                   methodparam='penalty-lagrange',
                                   stochagradparam=True,
                                   options={})
-
 
 # ----- create optimizer object
 optimi = Optimizer(s,

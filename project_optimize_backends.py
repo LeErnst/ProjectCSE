@@ -298,7 +298,7 @@ class ProjectScipyBackend(Backend):
 
 
 def sgd(func, x0, args, 
-        maxiter=250,
+        maxiter=500,
         stepsize=1e-9,
         thetaf=1e-2,
         p=None,
@@ -312,8 +312,8 @@ def sgd(func, x0, args,
 
     while (1):
         # iteration rule
-#        xk = xk_1 - stepsize*stochagrad(xk_1) 
-        xk = xk_1 - stepsize*gradient(xk_1) 
+        xk = xk_1 - stepsize*stochagrad(xk_1) 
+#        xk = xk_1 - stepsize*gradient(xk_1) 
         fk = func(xk)
         gk = gradient(xk)
 
@@ -322,13 +322,69 @@ def sgd(func, x0, args,
         ismin = termcondition(fk, fk_1, xk, xk_1, gk,
                               thetaf,
                               p)
-        printArray('stochastic gradient =\n', stochagrad(xk))
+#        printArray('stochastic gradient =\n', stochagrad(xk))
         if ((ismin) or (iternum >= maxiter)):
             break
         xk_1 = xk
         fk_1 = fk
 
     return OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+
+
+def adam(func, x0, args, 
+         maxiter=100,
+         stepsize=1e-2,
+         beta1=0.5,
+         beta2=0.999,
+         epsilon=1e-3,
+         thetaf=1e-1,
+         p=None,
+         **kwargs):
+
+    gradient = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    iternum = 0
+    xk_1 = x0
+    fk_1 = func(x0)
+
+    # 1st moment vector
+    mk_1 = numpy.zeros(len(x0))
+    # 2nd moment vector
+    vk_1 = numpy.zeros(len(x0))
+
+    while (1):
+        iternum += 1
+        # get stochastic gradient
+        gk = stochagrad(xk_1)
+        # update first moment estimate
+        mk   = beta1*mk_1+(1-beta1)*gk
+        mk_1 = mk
+        # update second moment estimate
+        vk   = beta2*vk_1+(1-beta2)*numpy.power(gk,2)
+        vk_1 = vk
+        # compute bias-corrected first moment estimate
+        mk_hat = mk/(1-numpy.power(beta1,iternum))
+        # compute bias-corrected first moment estimate
+        vk_hat = vk/(1-numpy.power(beta2,iternum))
+        # iteration rule
+        xk = xk_1 - stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon)
+
+        fk = func(xk)
+        gk = gradient(xk)
+
+        # termination
+        ismin = termcondition(fk, fk_1, xk, xk_1, gk,
+                              thetaf,
+                              p)
+#        printArray('stochastic gradient =\n', stochagrad(xk))
+        if ((ismin) or (iternum >= maxiter)):
+            break
+        xk_1 = xk
+        fk_1 = fk
+
+    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+
 
 
 def gradient_descent(func, x0, args=(),
