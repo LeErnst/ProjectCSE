@@ -51,7 +51,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
                                        sgd,
                                        gradient_descent,
-                                       adam)
+                                       adam,
+                                       adamax)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -177,14 +178,8 @@ def osupdate(my_s):
 # ---- own neldermead
 #opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,
 #                                  methodparam='penalty-lagrange',
-#                                  options={'maxiter': 50 , 'xatol': 1e-5,\
+#                                  options={'maxiter': 100 , 'xatol': 1e-5,\
 #                                           'fatol': 1e-5})
-
-# ---- stochastic gradient descent
-#opt_backend = ProjectScipyBackend(optimize_func=sgd,
-#                                  methodparam='penalty-lagrange',
-#                                  stochagradparam=True,
-#                                  options={})
 
 
 # ---- stochastic gradient descent

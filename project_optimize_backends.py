@@ -300,8 +300,8 @@ class ProjectScipyBackend(Backend):
 def sgd(func, x0, args, 
         maxiter=500,
         stepsize=1e-9,
-        thetaf=1e-2,
-        p=None,
+        methods='nag',
+        gamma=0.9,
         **kwargs):
 
     gradient = kwargs['grad']
@@ -310,20 +310,37 @@ def sgd(func, x0, args,
     xk_1 = x0
     fk_1 = func(x0)
 
+    # momentum vector
+    vk_1 = numpy.zeros(len(x0))
+
     while (1):
+        # update iteration number
+        iternum += 1
+
+        # choose the method
+        if (methods == 'vanilla'):
+            vk = stepsize*stochagrad(xk_1)
+        if (methods == 'momentum'):
+            # momentum vector
+            vk = gamma*vk_1+stepsize*stochagrad(xk_1)
+            vk_1 = vk
+        if (methods == 'nag'):
+            # nesterov accelerated gradient
+            vk = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
+            vk_1 = vk
+
         # iteration rule
-        xk = xk_1 - stepsize*stochagrad(xk_1) 
-#        xk = xk_1 - stepsize*gradient(xk_1) 
+        xk = xk_1 - vk 
+        # debugging
         fk = func(xk)
         gk = gradient(xk)
+        gknorm = numpy.linalg.norm(gk, numpy.inf)
+        print('gknorm = %7.4f' %(gknorm))
+        print('fk     = %7.4f' %(fk))
 
         # termination
-        iternum += 1
-        ismin = termcondition(fk, fk_1, xk, xk_1, gk,
-                              thetaf,
-                              p)
-#        printArray('stochastic gradient =\n', stochagrad(xk))
-        if ((ismin) or (iternum >= maxiter)):
+        if ((iternum >= maxiter) or\
+            ((fk < 3.) and (gknorm <= 500))):
             break
         xk_1 = xk
         fk_1 = fk
@@ -331,15 +348,12 @@ def sgd(func, x0, args,
     return OptimizeResult(fun=fk, x=xk, nit=iternum)
 
 
-
 def adam(func, x0, args, 
-         maxiter=100,
+         maxiter=300,
          stepsize=1e-2,
-         beta1=0.5,
-         beta2=0.999,
-         epsilon=1e-3,
-         thetaf=1e-1,
-         p=None,
+         beta1=0.1,
+         beta2=0.99,
+         epsilon=1e-2,
          **kwargs):
 
     gradient = kwargs['grad']
@@ -354,6 +368,7 @@ def adam(func, x0, args,
     vk_1 = numpy.zeros(len(x0))
 
     while (1):
+        # update iteration number
         iternum += 1
         # get stochastic gradient
         gk = stochagrad(xk_1)
@@ -372,13 +387,67 @@ def adam(func, x0, args,
 
         fk = func(xk)
         gk = gradient(xk)
-
+        gknorm = numpy.linalg.norm(gk, numpy.inf)
+        print('gknorm = %7.4f' %(gknorm))
+        print('fk     = %7.4f' %(fk))
         # termination
-        ismin = termcondition(fk, fk_1, xk, xk_1, gk,
-                              thetaf,
-                              p)
-#        printArray('stochastic gradient =\n', stochagrad(xk))
-        if ((ismin) or (iternum >= maxiter)):
+        if (fk < 1e-10):
+            break
+
+        if ((iternum >= maxiter) or\
+            ((fk < 3.) and (gknorm <= 500))):
+            break
+        xk_1 = xk
+        fk_1 = fk
+
+    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+
+def adamax(func, x0, args, 
+           maxiter=300,
+           stepsize=1e-2,
+           beta1=0.09,
+           beta2=0.99,
+           thetaf=1e-1,
+           p=None,
+           **kwargs):
+
+    gradient = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    iternum = 0
+    xk_1 = x0
+    fk_1 = func(x0)
+    ismin = False
+
+    # 1st moment vector
+    mk_1 = numpy.zeros(len(x0))
+    # 2nd moment vector
+    vk_1 = numpy.zeros(len(x0))
+
+    while (1):
+        iternum += 1
+        # get stochastic gradient
+        gk = stochagrad(xk_1)
+        # update first moment estimate
+        mk   = beta1*mk_1+(1-beta1)*gk
+        mk_1 = mk
+        # update second moment estimate
+        vk   = numpy.maximum(beta2*vk_1, numpy.absolute(gk))
+        vk_1 = vk
+        # iteration rule
+        xk = xk_1 - (stepsize/(1-numpy.power(beta1,iternum)))*mk/vk
+
+        fk = func(xk)
+        gk = gradient(xk)
+        gknorm = numpy.linalg.norm(gk, numpy.inf)
+        print('gknorm = %7.4f' %(gknorm))
+        print('fk     = %7.4f' %(fk))
+        # termination
+        if (fk < 1e-10):
+            break
+
+        if ((iternum >= maxiter) or\
+            ((fk < 3.) or (gknorm <= 500))):
             break
         xk_1 = xk
         fk_1 = fk
