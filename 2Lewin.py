@@ -52,7 +52,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        sgd,
                                        gradient_descent,
                                        adam,
-                                       adamax)
+                                       adamax,
+                                       adagrad)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 

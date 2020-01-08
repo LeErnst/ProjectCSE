@@ -2,6 +2,7 @@ from __future__ import print_function
 import math
 import random
 import numpy
+import scipy
 import sys
 from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
@@ -448,6 +449,98 @@ def adamax(func, x0, args,
 
         if ((iternum >= maxiter) or\
             ((fk < 3.) or (gknorm <= 500))):
+            break
+        xk_1 = xk
+        fk_1 = fk
+
+    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+
+def adagrad(func, x0, args, 
+            maxiter=300,
+            stepsize=1e-3,
+            epsilon=1e-3,
+            **kwargs):
+
+    gradient = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    iternum = 0
+    dim = len(x0)
+    xk_1 = x0
+    fk_1 = func(x0)
+    G = numpy.zeros(dim)
+
+    while (1):
+        # update iteration number
+        iternum += 1
+        # get stochastic gradient
+        gk = stochagrad(xk_1)
+        # update G
+        G += gk*gk
+        # iteration rule
+        xk = xk_1 - stepsize*(gk/(numpy.sqrt(G)+epsilon))
+
+        # debugging
+        fk = func(xk)
+        gk = gradient(xk)
+        gknorm = numpy.linalg.norm(gk, numpy.inf)
+        print('gknorm = %7.4f' %(gknorm))
+        print('fk     = %7.4f' %(fk))
+
+        # termination
+        if (fk < 1e-10):
+            break
+
+        if ((iternum >= maxiter) or\
+            ((fk < 3.) and (gknorm <= 500))):
+            break
+        xk_1 = xk
+        fk_1 = fk
+
+    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+def adadelta(func, x0, args, 
+             maxiter=300,
+             stepsize=1e-3,
+             gamma=0.9,
+             epsilon=1e-3,
+             **kwargs):
+
+    gradient = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    iternum = 0
+    dim = len(x0)
+    xk_1 = x0
+    fk_1 = func(x0)
+    gk = stochagrad(x0)
+    Ek_1 = numpy.zeros(dim)
+
+    while (1):
+        # update iteration number
+        iternum += 1
+        # get stochastic gradient
+        gk = stochagrad(xk_1)
+        # update E
+        Ek   = gamma*Ek_1+(1-gamma)*gk*gk
+        Ek_1 = Ek
+        # delta
+        deltak = -stepsize
+        # iteration rule
+        xk = xk_1 - stepsize*(gk/(numpy.sqrt(G)+epsilon))
+
+        # debugging
+        fk = func(xk)
+        gk = gradient(xk)
+        gknorm = numpy.linalg.norm(gk, numpy.inf)
+        print('gknorm = %7.4f' %(gknorm))
+        print('fk     = %7.4f' %(fk))
+
+        # termination
+        if (fk < 1e-10):
+            break
+
+        if ((iternum >= maxiter) or\
+            ((fk < 3.) and (gknorm <= 500))):
             break
         xk_1 = xk
         fk_1 = fk
