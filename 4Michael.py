@@ -50,8 +50,8 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
 from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
                                        gradient_descent,
-                                       PSO_standard,
-                                       PSO_constraint,
+                                       #PSO_standard,
+                                       #PSO_constraint,
                                        PSO_NM,
                                        sgd)
 # --- debugging 
