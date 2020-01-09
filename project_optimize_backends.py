@@ -340,8 +340,7 @@ def sgd(func, x0, args,
         print('fk     = %7.4f' %(fk))
 
         # termination
-        if ((iternum >= maxiter) or\
-            ((fk < 3.) and (gknorm <= 500))):
+        if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -395,8 +394,7 @@ def adam(func, x0, args,
         if (fk < 1e-10):
             break
 
-        if ((iternum >= maxiter) or\
-            ((fk < 3.) and (gknorm <= 500))):
+        if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -447,8 +445,7 @@ def adamax(func, x0, args,
         if (fk < 1e-10):
             break
 
-        if ((iternum >= maxiter) or\
-            ((fk < 3.) or (gknorm <= 500))):
+        if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -491,42 +488,49 @@ def adagrad(func, x0, args,
         if (fk < 1e-10):
             break
 
-        if ((iternum >= maxiter) or\
-            ((fk < 3.) and (gknorm <= 500))):
+        if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
         fk_1 = fk
 
     return OptimizeResult(fun=fk, x=xk, nit=iternum)
 
+
 def adadelta(func, x0, args, 
              maxiter=300,
-             stepsize=1e-3,
-             gamma=0.9,
-             epsilon=1e-3,
+             roh=0.9999,
+             epsilon=1e-7,
              **kwargs):
 
-    gradient = kwargs['grad']
+    gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
     iternum = 0
     dim = len(x0)
     xk_1 = x0
     fk_1 = func(x0)
-    gk = stochagrad(x0)
-    Ek_1 = numpy.zeros(dim)
+    Egk_1 = numpy.zeros(dim)
+    Exk_1 = numpy.zeros(dim)
 
     while (1):
         # update iteration number
         iternum += 1
         # get stochastic gradient
         gk = stochagrad(xk_1)
-        # update E
-        Ek   = gamma*Ek_1+(1-gamma)*gk*gk
-        Ek_1 = Ek
+        # accumulate gradient
+        Egk   = roh*Egk_1+(1-roh)*gk*gk
+        Egk_1 = Egk
+        # calculate RMS[g]_k and RMS[delta x]_k-1
+        RMSg = numpy.sqrt(Egk  +epsilon)
+        RMSx = numpy.sqrt(Exk_1+epsilon)
+        #print(RMSx/RMSg)
+        #print((RMSx/RMSg)*gk)
         # delta
-        deltak = -stepsize
+        delta_xk = -(RMSx/RMSg)*gk
         # iteration rule
-        xk = xk_1 - stepsize*(gk/(numpy.sqrt(G)+epsilon))
+        xk = xk_1 + delta_xk
+        # accumulate updates
+        Exk   = roh*Exk_1+(1-roh)*delta_xk*delta_xk
+        Exk_1 = Exk
 
         # debugging
         fk = func(xk)
@@ -539,8 +543,7 @@ def adadelta(func, x0, args,
         if (fk < 1e-10):
             break
 
-        if ((iternum >= maxiter) or\
-            ((fk < 3.) and (gknorm <= 500))):
+        if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -558,7 +561,7 @@ def gradient_descent(func, x0, args=(),
     while (iternum < maxiter):
         iternum += 1
         xk -= stepsize*grad(xk)
-        if (numpy.linalg.norm(grad(xk), numpy.inf) < 1e-1):
+        if (numpy.linalg.norm(grad(xk), numpy.inf) <= 500):
             print('\ngradient is near zero\n')
             print('||grad(x_final)||_inf = %10.6'\
                   % (numpy.linalg.norm(grad(xk), numpy.inf)))
@@ -567,6 +570,7 @@ def gradient_descent(func, x0, args=(),
 
     printArray('gradient in gradient decsent for x_final = ', grad(xk))
     return OptimizeResult(fun=func(xk), x=xk, nit=iternum)
+
 
 def test_minimize_neldermead(func, x0, args=(), 
                              maxiter=100, 

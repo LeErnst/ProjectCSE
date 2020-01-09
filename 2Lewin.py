@@ -53,7 +53,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        gradient_descent,
                                        adam,
                                        adamax,
-                                       adagrad)
+                                       adagrad,
+                                       adadelta)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -184,7 +185,7 @@ def osupdate(my_s):
 
 
 # ---- stochastic gradient descent
-opt_backend = ProjectScipyBackend(optimize_func=adam,
+opt_backend = ProjectScipyBackend(optimize_func=adadelta,
                                   methodparam='penalty-lagrange',
                                   stochagradparam=True,
                                   options={})
