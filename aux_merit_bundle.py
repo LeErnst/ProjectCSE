@@ -120,8 +120,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
                 # put x and y value for ALL wavelengths in x and y array 
                 # to caculate mean
-                x.append(rpaths[0].raybundles[-1].x[-1, 0, :])
-                y.append(rpaths[0].raybundles[-1].x[-1, 1, :])
+                x.extend(rpaths[0].raybundles[-1].x[-1, 0, :])
+                y.extend(rpaths[0].raybundles[-1].x[-1, 1, :])
 
             # Add up all the mean values of the different wavelengths
             xmean = np.mean(x)
