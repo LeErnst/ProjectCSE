@@ -50,6 +50,9 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
 from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
                                        gradient_descent,
+                                       PSO_standard,
+                                       PSO_constraint,
+                                       PSO_NM,
                                        sgd)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
@@ -122,7 +125,7 @@ numrays = 10
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength, 
                                     whichmeritfunc='standard', 
-                                    error='error2')
+                                    error='error2',sample_param='bundle')
 
 
 # ----- plot the original system
@@ -167,14 +170,18 @@ def osupdate(my_s):
 
 
 # BENCHMARKING:
-methods = [ ["Nelder-Mead","penalty"],\
-            [test_minimize_neldermead,"penalty"], \
-            ["CG","penalty-lagrange"],\
-            ["BFGS","penalty-lagrange"],\
-            ["TNC","standard"],\
-            ["L-BFGS-B","standard"],\
-            ["SLSQP","standard"],\
-            [gradient_descent,"penalty","penalty-lagrange"] ]
+methods = [ #["Nelder-Mead","penalty"],\
+            #[test_minimize_neldermead,"penalty"], \
+            #["CG","standard"],\
+            #["BFGS","penalty"],\
+            #["TNC","standard"],\
+            #["L-BFGS-B","standard"],\
+            #["SLSQP","standard"],\
+            #[gradient_descent,"penalty","penalty-lagrange"]
+            #[PSO_standard,"penalty"],\
+            #[PSO_constraint,"standard"],\
+            [PSO_NM,"standard"]
+            ]
 
 benchmark(s,meritfunctionrms,osupdate,methods)
 """
