@@ -47,9 +47,10 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      Newton1DBackend,
                                                      ParticleSwarmBackend,
                                                      SimulatedAnnealingBackend)
-from project_optimize_backends import (ProjectScipyBackend,
-                                       test_minimize_neldermead,
-                                       sgd)
+from project_optimize_backends import (ProjectScipyBackend,\
+                                       test_minimize_neldermead,\
+                                       sgd,\
+                                       gradient_descent)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -113,12 +114,12 @@ osa = OpticalSystemAnalysis(s, sysseq)
 # III ----------- defining raybundles for optimization and plotting 
 rays_dict=fi1.get_rays_dict()
 #TODO In Landos code noch wavelength and numrays einpflegen
-wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
+wavelength = [0.58749e-3]#, 0.6562725e-3]
 numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                     numrays, wavelength, 
-                                    whichmeritfunc='sgd', 
+                                    whichmeritfunc='standard', 
                                     error='error2')
 
 
@@ -159,19 +160,20 @@ def osupdate(my_s):
 
 # ----- choose the backend
 
-# opt_backend = ScipyBackend(method='Nelder-Mead',
-#                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
-
-
 
 #*******************************************************************************
 #****ALS FUNKTION AUSLAGERN???**************************************************
 #*******************************************************************************
 # choose our own backend for testing some algos
-opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,
-                                  methodparam=2,
-                                  options={'maxiter': 100, 'xatol': 1e-5,\
-                                           'fatol': 1e-5})
+
+# possible methodparams = {standard, penalty, penalty-lagrange, log}
+
+# for problems increase the stepsize
+opt_backend = ProjectScipyBackend(optimize_func='cg',#differential-evolution',#nelder-mead',#test_minimize_neldermead,
+                                  methodparam='penalty-lagrange',
+                                  options={'maxiter': 12, 'gtol':1})#,
+                                            #'xatol': 1e-14,
+                                            #'fatol': 1e-14})
 
 # ----- create optimizer object
 optimi = Optimizer(s,

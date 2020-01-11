@@ -122,7 +122,10 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 # to caculate mean
                 x.extend(rpaths[0].raybundles[-1].x[-1, 0, :])
                 y.extend(rpaths[0].raybundles[-1].x[-1, 1, :])
-
+            
+            #Add penalty term for fewer rays hitting the image surface
+            res += 50.*math.exp(-len(x))
+            
             # Add up all the mean values of the different wavelengths
             xmean = np.mean(x)
             ymean = np.mean(y)
