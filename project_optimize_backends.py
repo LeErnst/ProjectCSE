@@ -697,15 +697,16 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
     #rm is a method which brings a solution x in a infeasible region ...
     #to a feasible region
     #---------------------------------------------------------------------------
-    def rm(x,lb,ub):                      # repair method (later grad.bas.r.m)
+    def rm(x,lb,ub,vel_max):                      # repair method (later grad.bas.r.m)
         # moves positions on bounds if they don't be in the feasible region
+        # ACHTUNG: angepasst mit vel_max
         from copy import deepcopy
         x_neu = deepcopy(x)
         for t in range(len(x)):
             if (x[t]<lb[t]):
-                x_neu[t] = lb[t]
+                x_neu[t] = lb[t] + 2*vel_max[t]
             if (x[t]>ub[t]):
-                x_neu[t] = ub[t]
+                x_neu[t] = ub[t] - 2*vel_max[t]
         return x_neu
 
     def Cf(x,lb,ub):                        # Constraint fitness priority-based ranking method
@@ -944,7 +945,7 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             # check if solution is in feasibale region, else apply Repair Method
             if not (numpy.all(swarm[i].pos>=bounds.lb) and \
                     numpy.all(swarm[i].pos<=bounds.ub)):
-                repairedPos = rm(swarm[i].pos,bounds.lb,bounds.ub)
+                repairedPos = rm(swarm[i].pos,bounds.lb,bounds.ub,vel_max)
                 test += 1
                 swarm[i].updatePos(repairedPos)
             # write tupel (i,f(i)) in liste:
@@ -1004,6 +1005,7 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             swarm[second].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)
 
         k = k+1
+
 
     """
         # loop over all particles:
