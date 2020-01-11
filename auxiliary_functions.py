@@ -624,3 +624,48 @@ def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
     return ismin
 
 
+def plot2d(xarray, yarray,
+           title='',
+           fonttitle=14,
+           xlabel='',
+           ylabel='',
+           fontaxis=12,
+           legend='',
+           fontlegend=12,
+           loclegend='best',
+           xlim='auto',
+           ylim='auto',
+           xlog=False,
+           ylog=False,
+           grid=True,
+           linewidth=2,
+           linestyle='-o'):
+
+    plt.figure()
+    plt.plot(xarray, yarray, linestyle, lw=linewidth, label=legend)
+    # axis
+    plt.xlabel(xlabel, fontsize=fontaxis)
+    plt.ylabel(ylabel, fontsize=fontaxis)
+    # log scale
+    if (xlog==True):
+        plt.xscale('log')
+    if (ylog==True):
+        plt.yscale('log')
+    # set xlim and ylim
+    if not (xlim=='auto'):
+        plt.xlim(xlim[0],xlim[1])
+    if not (ylim=='auto'):
+        plt.ylim(ylim[0],ylim[1])
+    # title
+    # remark: matplotlib accepts Tex $ $-expressions,
+    #         like plt.title(r'$\sigma_{i}=15$'), where the r indicates that the
+    #         backslash is not to treat like in python, but in latex
+    plt.title(title, fontsize=fonttitle)
+    # set legend
+    plt.legend(loc=loclegend, prop={'size': fontlegend})
+    # set grid
+    plt.grid(grid)
+    # plot
+    plt.show()
+
+

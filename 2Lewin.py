@@ -130,10 +130,6 @@ sample_param = 'bundle'
                                                      whichmeritfunc='sgd', 
                                                      error='error2',
                                                      sample_param=sample_param)
-#mask = np.zeros(44, dtype=bool)
-#mask[5] = True
-#print(initialbundle[0][0].x.shape)
-#sys.exit()
 
 
 # ----- plot the original system

@@ -390,10 +390,8 @@ def adam(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-        # termination
-        if (fk < 1e-10):
-            break
 
+        # termination
         if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
@@ -441,10 +439,8 @@ def adamax(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-        # termination
-        if (fk < 1e-10):
-            break
 
+        # termination
         if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
@@ -485,9 +481,6 @@ def adagrad(func, x0, args,
         print('fk     = %7.4f' %(fk))
 
         # termination
-        if (fk < 1e-10):
-            break
-
         if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
@@ -522,8 +515,6 @@ def adadelta(func, x0, args,
         # calculate RMS[g]_k and RMS[delta x]_k-1
         RMSg = numpy.sqrt(Egk  +epsilon)
         RMSx = numpy.sqrt(Exk_1+epsilon)
-        #print(RMSx/RMSg)
-        #print((RMSx/RMSg)*gk)
         # delta
         delta_xk = -(RMSx/RMSg)*gk
         # iteration rule
@@ -540,15 +531,37 @@ def adadelta(func, x0, args,
         print('fk     = %7.4f' %(fk))
 
         # termination
-        if (fk < 1e-10):
-            break
-
         if ((iternum >= maxiter) or (gknorm <= 500)):
             break
         xk_1 = xk
         fk_1 = fk
 
     return OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+
+def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_method, backend_bdry):
+
+    lb = numpy.empty([len(backend_bdry)/2])
+    ub = numpy.empty([len(backend_bdry)/2])
+    for i in range(len(backend_bdry)/2)):
+        lb[i] = backend_bdry[2*i]
+        ub[i] = backend_bdry[2*i+1]
+    bound = scipy.minimize.Bounds(lb,ub)
+    
+    def scipy_stochastic_hybrid(func, x0, args=(),
+                                maxiter=200,
+                                stepsize=1e-8,
+                                **kwargs):
+        kwargs['bounds'] = bound
+        # stochastic method to get in a surrounding of a minimum
+        res_approx = stocha_opt_func(func, x0, args, 
+                                     maxiter=maxiter
+        x_approx = res_approx.x
+        # deterministic method to get convergence
+        res_sol = scipy.minimize()
+        x_sol = res_sol.x
+        
+        return OptimizeResult(fun=fk, x=xk, nit=iternum)
 
 
 
