@@ -3,5 +3,5 @@
 #If there should be more than two start values write 5&4&7 <- e.g. three start values
 #Possible values for the raster object: At the moment only RectGrid is implemented 
 #Write down just one line. More lines are not necessary and not supported. You can specify more bunderls within a line
-#startx         starty          startz                 radius          anglex             angley            numrays           wavelength                      raster  
-0               0           -7                    6              0.03&-0.05&0.      0               50              0.5875618e-3&0.4861327e-3     RectGrid
+#startx         starty      startz               radius      anglex          angley          numrays         wavelength         raster  
+0               0           0                    16          0.0&0.1832595   0               50              0.58749e-3         RectGrid

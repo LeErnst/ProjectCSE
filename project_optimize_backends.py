@@ -13,7 +13,7 @@ from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
                                 termcondition
 
 class ProjectScipyBackend(Backend):
-    def __init__(self, optimize_func, methodparam=None, tau0=1.0,
+    def __init__(self, optimize_func, methodparam=None, tau0=2.0,
                  options={}, stochagradparam=False, **kwargs):
         self.optimize_func   = optimize_func
         self.options         = options
@@ -23,6 +23,13 @@ class ProjectScipyBackend(Backend):
         self.tauk            = tau0
         self.lamk            = 1.
         self.stochagrad      = None
+
+        #set tolerance for gradient to check if x is a minima
+        if 'gtol' in options.keys() :
+            self.gtol = options.get('gtol')
+        else :
+            self.gtol = 1e-8
+
         # self.func = MeritFunctionWrapper is set within the Optimizer __init__ 
 
     def update_PSB(self, optimi) :
@@ -62,6 +69,15 @@ class ProjectScipyBackend(Backend):
                            method=self.optimize_func,
                            options=self.options, 
                            **self.kwargs)
+            #TEST LEANDRO
+            #attempt to use numpy, global, stochastic algorithms
+            #does not work yet
+            #bound =  [[0]*2 for i in range(len(x0))]
+            #for i in range(len(x0)/2) :
+            #    bound[i][0] = self.bdry[2*i]
+            #    bound[i][1] = self.bdry[2*i+1]
+                    
+            #res = differential_evolution(self.func, bound, maxiter=1, popsize=750, strategy='rand2exp')
 
         elif (self.methodparam == 'penalty'):
 
@@ -69,7 +85,7 @@ class ProjectScipyBackend(Backend):
 
             print('----------------- run penalty -----------------')
 
-            xk_1 = x0
+            #xk_1 = x0
             xk   = x0
             while (1): 
                 # define the gradient for the penalty method
@@ -90,9 +106,9 @@ class ProjectScipyBackend(Backend):
                         return res
                 # store the grad-function in options
                 self.options['grad'] = grad_total
-
+                
                 # for benchmark
-                self.kwargs['jac'] = grad_total
+                #self.kwargs['jac'] = grad_total
  
                 # update iteration number
                 iterNum += 1
@@ -112,6 +128,7 @@ class ProjectScipyBackend(Backend):
                                x0=xk, 
                                args=(), 
                                method=self.optimize_func,
+                               jac=grad_total,
                                options=self.options, 
                                **self.kwargs)
                 # update xk
@@ -121,9 +138,16 @@ class ProjectScipyBackend(Backend):
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
+                if ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
+                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
                     print('\n----------- end of penalty run -----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif (iterNum>=50):
+                    print('\n----------- end of penalty run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
@@ -132,8 +156,7 @@ class ProjectScipyBackend(Backend):
                     self.tauk = 7*self.tauk 
 
                 # update xk-1 
-                xk_1 = xk
-
+                #xk_1 = xk
 
         elif (self.methodparam == 'penalty-lagrange'):
 
@@ -142,7 +165,7 @@ class ProjectScipyBackend(Backend):
             print('----------------- run penalty lagrange -----------------')
 
             # choose the initial lamda
-            self.lamk = 0.333*numpy.ones(2*len(x0))
+            self.lamk = numpy.ones(2*len(x0))
 
             xk_1 = x0
             xk   = x0
@@ -169,7 +192,7 @@ class ProjectScipyBackend(Backend):
                 self.options['grad']= grad_total
             
                 # for benchmark
-                self.kwargs['jac'] = grad_total
+                #self.kwargs['jac'] = grad_total
 
                 # update iteration number
                 iterNum += 1
@@ -178,8 +201,8 @@ class ProjectScipyBackend(Backend):
                 printArray('bdry =', self.bdry)
                 print('\ntau = %6.3f' % (self.tauk))
                 printArray('lambda_k =', self.lamk)
-                printArray('gradient of the penalty term =',\
-                           grad_lag(xk,self.bdry, self.tauk, self.lamk))
+                #printArray('gradient of the penalty term =',\
+                #           grad_lag(xk,self.bdry, self.tauk, self.lamk))
 
 
                 # find local minimizer of 
@@ -193,6 +216,7 @@ class ProjectScipyBackend(Backend):
                                x0=xk, 
                                args=(), 
                                method=self.optimize_func,
+                               jac=grad_total,
                                options=self.options, 
                                **self.kwargs)
                 # update xk
@@ -202,9 +226,16 @@ class ProjectScipyBackend(Backend):
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
+                if ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
+                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
                     print('\n---------- end of penalty lagrange run ----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif (iterNum>=50):
+                    print('\n----------- end of penalty run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
