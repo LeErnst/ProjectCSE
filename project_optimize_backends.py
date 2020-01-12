@@ -730,6 +730,8 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
     tol = 1e-12         # for check if sth x==0 -> check x<tol and x>-tol
     
     bounds = unknown_options['bounds']
+    lb = bounds.lb
+    ub = bounds.ub
     n = len(x0)
     # generate initial_simplex:
     initial_simplex = numpy.empty([n+1,n])
