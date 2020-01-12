@@ -53,6 +53,7 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        #PSO_standard,
                                        #PSO_constraint,
                                        PSO_NM,
+                                       Nelder_Mead_Constraint,
                                        sgd)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
@@ -180,7 +181,8 @@ methods = [ #["Nelder-Mead","penalty"],\
             #[gradient_descent,"penalty","penalty-lagrange"]
             #[PSO_standard,"penalty"],\
             #[PSO_constraint,"standard"],\
-            [PSO_NM,"standard"]
+            #[PSO_NM,"standard"],\
+            [Nelder_Mead_Constraint,"standard"]
             ]
 
 benchmark(s,meritfunctionrms,osupdate,methods)
