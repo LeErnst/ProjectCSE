@@ -881,7 +881,7 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
 
 
 def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
-                 c0=None,c1=1.4,c2=1.4,**unknown_options):
+                 c0=None,c1=2.0,c2=2.0,**unknown_options):
     # N = population size (has to be: N >= 2n+1; with n=problem size)
     # vel_max = maximal velocity of a particle
     # c0,c1 and c2 are variables for updating the velocity of the particles
@@ -1151,9 +1151,10 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             print("bounds are good")
         # Update xBest and xBest_f if solution is better:
         if (liste[0][1] <= xBest_f):
+            if (abs(list[0][1]-xBest_f)>1e-3):  # check if global fBest is changing sifnificantly
+                stopCrit = 0
             xBest = swarm[liste[0][0]].pos
             xBest_f = liste[0][1]
-            stopCrit = 0
 
         stopCrit = stopCrit+1
         print("Best = ",xBest_f)
