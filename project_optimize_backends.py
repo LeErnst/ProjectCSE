@@ -1151,7 +1151,7 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             print("bounds are good")
         # Update xBest and xBest_f if solution is better:
         if (liste[0][1] <= xBest_f):
-            if (abs(list[0][1]-xBest_f)>1e-3):  # check if global fBest is changing sifnificantly
+            if (abs(liste[0][1]-xBest_f)>1e-3):  # check if global fBest is changing sifnificantly
                 stopCrit = 0
             xBest = swarm[liste[0][0]].pos
             xBest_f = liste[0][1]
