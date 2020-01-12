@@ -1190,12 +1190,12 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             first = firstN[i]
             second = secondN[i]
             nBest = 0
-            if (swarm[first].pos_f <= swarm[second].pos_f):
-                nBest = first
+            if (liste[first][1] <= liste[second][1]):
+                nBest = liste[first][0]
             else:
-                nBest = second
-            swarm[first].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)     # update velocity and position
-            swarm[second].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)
+                nBest = liste[second][0]
+            swarm[liste[first][0]].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)     # update velocity and position
+            swarm[liste[second][0]].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)
 
         k = k+1
 
