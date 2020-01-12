@@ -49,12 +49,13 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
                                                      SimulatedAnnealingBackend)
 from project_optimize_backends import (ProjectScipyBackend,
                                        test_minimize_neldermead,
-                                       sgd,
                                        gradient_descent,
+                                       sgd,
                                        adam,
                                        adamax,
                                        adagrad,
-                                       adadelta)
+                                       adadelta,
+                                       get_scipy_stochastic_hybrid)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -70,7 +71,9 @@ from auxiliary_functions import calculateRayPaths,\
                                 plotBundles,\
                                 inout,\
                                 plotSpotDia, \
-                                get_bdry
+                                get_bdry, \
+                                plot2d
+
 # --- meritfunction and initialbundle
 from aux_merit_bundle import buildInitialbundle, get_bundle_merit
 
@@ -129,7 +132,8 @@ sample_param = 'bundle'
                                                      numrays, wavelength, 
                                                      whichmeritfunc='sgd', 
                                                      error='error2',
-                                                     sample_param=sample_param)
+                                                     sample_param=sample_param,
+                                                     penalty=True)
 
 
 # ----- plot the original system
@@ -179,12 +183,28 @@ def osupdate(my_s):
 #                                  options={'maxiter': 100 , 'xatol': 1e-5,\
 #                                           'fatol': 1e-5})
 
+hybrid_method = get_scipy_stochastic_hybrid(stocha_opt_func=adam,
+                                            scipy_opt_func ='TNC') 
+
+options={'gtol'     : 1e-2,
+         'options_d': {'maxiter': 100, 
+                       'xtol'   : 1e-5, 
+                       'ftol'   : 1e-5,
+                       'gtol'   : 1e-2,
+                       'disp'   : True},
+         'options_s': {'maxiter' : 100, 
+                       'stepsize': 1e-2, 
+                       'beta1'   : 0.1, 
+                       'beta2'   : 0.99,
+                       'gradtol' : 1500,
+                       'roh'     : 0.999,
+                       'epsilon' : 1e-2}}
 
 # ---- stochastic gradient descent
-opt_backend = ProjectScipyBackend(optimize_func=adadelta,
+opt_backend = ProjectScipyBackend(optimize_func=hybrid_method,
                                   methodparam='penalty-lagrange',
                                   stochagradparam=True,
-                                  options={})
+                                  options=options)
 
 # ----- create optimizer object
 optimi = Optimizer(s,

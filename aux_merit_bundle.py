@@ -84,7 +84,7 @@ def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10,
 
 def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                      wavelength=[0.587e-3], whichmeritfunc='standard',
-                     error='error2', sample_param='wave'):
+                     error='error2', sample_param='wave', penalty=False):
     """
     initializes the initialBundles and forms the meritfunction
     this is necessary as the meritfunction needs the initalbundle, but in the 
@@ -123,18 +123,15 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 x.extend(rpaths[0].raybundles[-1].x[-1, 0, :])
                 y.extend(rpaths[0].raybundles[-1].x[-1, 1, :])
             
-            #Add penalty term for fewer rays hitting the image surface
-            res += 50.*math.exp(-len(x))
-            
             # Add up all the mean values of the different wavelengths
             xmean = np.mean(x)
             ymean = np.mean(y)
 
             # Choose error function
             if (error == 'error2'):
-                res += error2squared(x, xmean, y, ymean)
+                res += error2squared(x, xmean, y, ymean, penalty=penalty)
             elif (error == 'error1'):
-                res += error1(x, xmean, y, ymean)
+                res += error1(x, xmean, y, ymean, penalty=penalty)
 
         return res
 
@@ -160,6 +157,13 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 sample_initialbundle = [initialbundle[sample_num//wavel]\
                                                      [sample_num%wavel]]
             if (sample_param == 'ray'):
+                # TODO:
+                # this option can cause an error, because the number of rays 
+                # numrays is predetermined and therefore can not be changed 
+                # during an optimization run but it can happen that not all rays
+                # hit the image plane. Because of that a random number can be 
+                # drawn but there is no associated ray. the mask, which has then
+                # the wrong size will then cause an error.
                 bundlenum = sample_num//(wavel*numrays)
                 wavenum   = (sample_num-wavel*numrays*bundlenum)//numrays
                 raynum    = sample_num-wavel*numrays*bundlenum-numrays*wavenum
@@ -191,9 +195,9 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
                 # Choose error function
                 if (error == 'error2'):
-                    res += error2squared(x, xmean, y, ymean)
+                    res += error2squared(x, xmean, y, ymean, penalty=penalty)
                 elif (error == 'error1'):
-                    res += error1(x, xmean, y, ymean)
+                    res += error1(x, xmean, y, ymean, penalty=penalty)
 
             return res
 

@@ -39,9 +39,20 @@ class ProjectScipyBackend(Backend):
         important to call this function AFTER the Optimizer object was created
         and BEFORE you run the optimization.
         '''
-
+        # calculate and assign the boundaries
         self.bdry = get_bdry(optimi)
         printArray('bdry in ProjectScipyBackend = ', self.bdry)
+
+        # make the boundaries available for the methods
+        # get the boundaries for the scipy algos
+        lb = numpy.empty([len(self.bdry)/2])
+        ub = numpy.empty([len(self.bdry)/2])
+        for i in range(len(self.bdry)/2):
+            lb[i] = self.bdry[2*i]
+            ub[i] = self.bdry[2*i+1]
+        # make it available 
+        self.kwargs['bounds'] = scipy.optimize.Bounds(lb,ub)
+        
     
     def run(self, x0):
         # tolerance for the infeasibility measurement 
@@ -121,8 +132,8 @@ class ProjectScipyBackend(Backend):
                 # find local minimizer of 
                 # meritfunction(x) + 0.5*tau_k*||h(x)||_2^2
                 penalty_func = lambda x: self.func(x) +\
-                                        0.5*self.tauk*numpy.square(\
-                                        numpy.linalg.norm(eval_h(x,self.bdry)))
+                                         0.5*self.tauk*numpy.square(\
+                                         numpy.linalg.norm(eval_h(x,self.bdry)))
                 
                 res = minimize(penalty_func,
                                x0=xk, 
@@ -154,6 +165,8 @@ class ProjectScipyBackend(Backend):
                 else: # xk is not in the feasible set -> update tauk
                     # update tau
                     self.tauk = 7*self.tauk 
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
 
                 # update xk-1 
                 #xk_1 = xk
@@ -245,6 +258,8 @@ class ProjectScipyBackend(Backend):
                     # update lambda
                     self.lamk = numpy.add(self.lamk, 
                                           self.tauk*eval_h(xk, self.bdry))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                 # update xk-1
                 xk_1 = xk
 
@@ -315,6 +330,8 @@ class ProjectScipyBackend(Backend):
                 else: # xk is not in the feasible set -> update my
                     # update my
                     self.my = self.my/10
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
 
                 # update xk-1
                 xk_1 = xk
@@ -334,6 +351,7 @@ def sgd(func, x0, args,
         stepsize=1e-9,
         methods='nag',
         gamma=0.9,
+        gradtol=1500,
         **kwargs):
 
     gradient = kwargs['grad']
@@ -371,7 +389,7 @@ def sgd(func, x0, args,
         print('fk     = %7.4f' %(fk))
 
         # termination
-        if ((iternum >= maxiter) or (gknorm <= 500)):
+        if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -385,6 +403,7 @@ def adam(func, x0, args,
          beta1=0.1,
          beta2=0.99,
          epsilon=1e-2,
+         gradtol=1500,
          **kwargs):
 
     gradient = kwargs['grad']
@@ -421,9 +440,10 @@ def adam(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+        print(xk-x0)
 
         # termination
-        if ((iternum >= maxiter) or (gknorm <= 500)):
+        if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -438,6 +458,7 @@ def adamax(func, x0, args,
            beta2=0.99,
            thetaf=1e-1,
            p=None,
+           gradtol=1500,
            **kwargs):
 
     gradient = kwargs['grad']
@@ -472,7 +493,7 @@ def adamax(func, x0, args,
         print('fk     = %7.4f' %(fk))
 
         # termination
-        if ((iternum >= maxiter) or (gknorm <= 500)):
+        if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -484,6 +505,7 @@ def adagrad(func, x0, args,
             maxiter=300,
             stepsize=1e-3,
             epsilon=1e-3,
+            gradtol=1500,
             **kwargs):
 
     gradient = kwargs['grad']
@@ -512,7 +534,7 @@ def adagrad(func, x0, args,
         print('fk     = %7.4f' %(fk))
 
         # termination
-        if ((iternum >= maxiter) or (gknorm <= 500)):
+        if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -522,8 +544,9 @@ def adagrad(func, x0, args,
 
 def adadelta(func, x0, args, 
              maxiter=300,
-             roh=0.9999,
-             epsilon=1e-7,
+             roh=0.999,
+             epsilon=1e-8,
+             gradtol=1500,
              **kwargs):
 
     gradient   = kwargs['grad']
@@ -562,7 +585,7 @@ def adadelta(func, x0, args,
         print('fk     = %7.4f' %(fk))
 
         # termination
-        if ((iternum >= maxiter) or (gknorm <= 500)):
+        if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
@@ -570,30 +593,42 @@ def adadelta(func, x0, args,
     return OptimizeResult(fun=fk, x=xk, nit=iternum)
 
 
-def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_method, backend_bdry):
+def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
 
-    lb = numpy.empty([len(backend_bdry)/2])
-    ub = numpy.empty([len(backend_bdry)/2])
-    for i in range(len(backend_bdry)/2)):
-        lb[i] = backend_bdry[2*i]
-        ub[i] = backend_bdry[2*i+1]
-    bound = scipy.minimize.Bounds(lb,ub)
-    
-    def scipy_stochastic_hybrid(func, x0, args=(),
-                                maxiter=200,
-                                stepsize=1e-8,
+    def scipy_stochastic_hybrid(func, x0, args=(), 
+                                options_s={},
+                                options_d={},
                                 **kwargs):
-        kwargs['bounds'] = bound
-        # stochastic method to get in a surrounding of a minimum
-        res_approx = stocha_opt_func(func, x0, args, 
-                                     maxiter=maxiter
-        x_approx = res_approx.x
-        # deterministic method to get convergence
-        res_sol = scipy.minimize()
-        x_sol = res_sol.x
-        
-        return OptimizeResult(fun=fk, x=xk, nit=iternum)
 
+        if (len(options_s)==0):
+            raise ValueError('There are no solver options for the stochastic \
+                              method')
+        
+        if (len(options_d)==0):
+            raise ValueError('There are no solver options for the scipy \
+                              method')
+
+        if (kwargs.get('stochagrad', None)==None):
+            raise ValueError('Stochastic gradient is required!')
+        '''
+        # stochastic method to get fast in a surrounding of a minimum
+        res_approx = stocha_opt_func(func, x0, args, 
+                                     grad      =kwargs['grad'],
+                                     stochagrad=kwargs['stochagrad'],
+                                     **options_s)
+        '''
+        # deterministic method to get convergence
+        res_sol = minimize(fun=func, x0=x0, args=args,
+                           method =scipy_opt_func,
+                           jac    =kwargs['jac'],
+                           options=options_d) 
+
+        # calculate the overall iteration number 
+        iternum = res_approx.nit + res_sol.nit
+        
+        return OptimizeResult(fun=res_sol.fun, x=res_sol.x, nit=iternum)
+    
+    return scipy_stochastic_hybrid
 
 
 def gradient_descent(func, x0, args=(),
