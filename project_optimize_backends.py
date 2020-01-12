@@ -701,6 +701,182 @@ def test_minimize_neldermead(func, x0, args=(),
                           final_simplex=(sim, fsim))
 
 
+def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
+                            **unknown_options):
+    #---------------------------------------------------------------------------
+    def Cf(x,lb,ub):                        # Constraint fitness priority-based ranking method
+        C = numpy.empty(len(lb)+len(ub))
+        g = numpy.empty(len(lb)+len(ub))
+        for t in range(len(x)):
+            g[2*t] = lb[t]-x[t]             # value of g_i(x)
+            g[2*t+1] = x[t]-ub[t]
+        gmax = numpy.amax(g)
+        for t in range(len(g)):
+            if (g[t]<=0):
+                C[t] = 1
+            else:
+                C[t] = 1-(g[t]/gmax)
+        weight = 1/float((len(C)))
+        Cf = 0
+        for t in range(len(C)):
+            Cf += weight*C[t]
+        return Cf
+    #---------------------------------------------------------------------------
+    # Parameter:
+    alpha = 1
+    beta = 0.5
+    gamma = 2
+    delta = 0.5
+    tol = 1e-12         # for check if sth x==0 -> check x<tol and x>-tol
+
+    N = len(x0)
+    # generate initial_simplex:
+    initial_simplex = numpy.empty([N+1,N])
+    for t in range(N+1):
+        initial_simplex[i] = numpy.random.uniform(bounds.lb,bounds.ub) #in feasible region
+    xfC = []                    # list with [[x1,f(x1),Cf(x1)],[x2,f(x2),Cf(x2)],...
+    for t in range(n+1):
+        xfC.append([initial_simplex[t],func(initial_simplex[t]),\
+                    Cf(initial_simplex[t],lb,ub)])
+    
+    # termination condition for first check in while loop:
+    f_mean = 0
+    for t in range(n+1):
+        f_mean += xfC[t][1]
+    f_mean = f_mean * (1/(float(n)+1))
+    error = 0
+    for t in range(n+1):
+        error += (xfC[t][1]-f_mean)**2
+    error *= 1/(float(n)+1)
+
+    it = 0
+    # sort xfC from low to high f(x) values
+    xfC = sorted(xfC,key=lambda elem: elem[1])
+    while (it <= maxiter and error > tol):
+        # Reflection:
+        # Determine x_cent without x_high:
+        x_cent = numpy.zeros(n)
+        for t in range(n):
+            for j in range(n):
+                x_cent[j] += xfC[t][0][j]
+        for t in range(n):
+            x_cent[t] /= n
+        # make reflection:
+        x_high = xfC[n][0]
+        f_high = xfC[n][1]
+        x_refl = (1+alpha)*x_cent-alpha*x_high
+        Cf_refl = Cf(x_refl,lb,ub)
+        f_refl = func(x_refl)
+        x_low = xfC[0][0]
+        Cf_low = xfC[0][2]
+        f_low = xfC[0][1]
+        
+
+        if ((Cf_refl<1 and Cf_refl>Cf_low) or ((Cf_refl<=1+tol and Cf_refl>=1-tol) and \
+            f_refl<f_low)):
+            # first expansion case:
+            if (Cf_refl<1 and Cf_refl>Cf_low):
+                x_exp = gamma*x_refl+(1-gamma)*x_cent
+                f_exp = func(x_exp)
+                Cf_exp = Cf(x_exp,lb,ub)
+                if (Cf_exp>Cf_low or (Cf_exp>=1-tol and Cf_exp<=1+tol)):
+                    # expansion accepted -> replace x_high by x_exp:
+                    xfC[n][0] = x_exp
+                    xfC[n][1] = f_exp
+                    xfC[n][2] = Cf_exp
+                else:
+                    # replace x_high by x_refl:
+                    xfC[n][0] = x_refl
+                    xfC[n][1] = f_refl
+                    xfC[n][2] = Cf_refl
+            # second expansion case:
+            if ((Cf_refl>=1-tol and Cf_refl<=1+tol)and(f_refl<f_low)):
+                x_exp = gamma*x_refl+(1-gamma)*x_cent
+                f_exp = func(x_exp)
+                Cf_exp = Cf(x_exp,lb,ub)
+                if ((Cf_exp>=1-tol and Cf_exp<=1+tol)and(f_exp<f_low)):
+                    # expansion ist acceptet, replace x_high by x_exp:
+                    xfC[n][0] = x_exp
+                    xfC[n][1] = f_exp
+                    xfC[n][2] = Cf_exp
+                else:
+                    # replacing x_high by x_refl:
+                    xfC[n][0] = x_refl
+                    xfC[n][1] = f_refl
+                    xfC[n][2] = Cf_refl
+
+        else:
+            # first contraction case:
+            if (Cf_refl<1 and Cf_refl<=Cf_low):
+                x_cont = beta*x_high+(1-beta)*x_cent
+                f_cont = func(x_cont)
+                Cf_cont = Cf(x_cont,lb,ub)
+                if ((Cf_cont>Cf_low)or(Cf_cont>=1-tol and Cf_cont<=1+tol)):
+                    # contraction is accepted: replace x_high by x_cont:
+                    xfC[n][0] = x_cont
+                    xfC[n][1] = f_cont
+                    xfC[n][2] = Cf_cont
+                else:
+                    # shrinkage attempts to all points except x_low:
+                    for t in range(n):
+                        xfC[1+t][0] *= delta
+                        xfC[1+t][0] += (1-delta)*x_low
+            # second contraction case:
+            if((Cf_refl>=1-tol and Cf_refl<=1+tol)and(f_refl>=f_low) \
+                and (f_refl<=f_high)):
+                # replace x_high by x_refl:
+                xfC[n][0] = x_refl
+                xfC[n][1] = f_refl
+                xfC[n][2] = Cf_refl
+                x_cont = beta*x_refl+(1-beta)*x_cent
+                f_cont = func(x_cont)
+                Cf_cont = Cf(x_cont,lb,ub)
+                if((Cf_cont>=1-tol and Cf_cont<=1+tol)and(f_cont<f_low)):
+                    # contraction accepted: replace x_high by x_cont
+                    xfC[n][0] = x_cont
+                    xfC[n][1] = f_cont
+                    xfC[n][2] = Cf_cont
+                else:
+                    # shrinkage the entire simplex but not x_low
+                    for t in range(n):
+                        xfC[1+t][0] *= delta
+                        xfC[1+t][0] += (1-delta)*x_low
+            # third contraction case:
+            if((Cf_refl>=1-tol and Cf_refl<=1+tol)and(f_refl>=f_low) \
+                and (f_refl>f_high)):
+                x_cont = beta*x_high+(1-beta)*x_cent
+                f_cont = func(x_cont)
+                Cf_cont = Cf(x_cont,lb,ub)
+                if((Cf_cont>=1-tol and Cf_cont<=1+tol)and(f_cont<f_low)):
+                    # contraction accepted: replace x_high by x_cont
+                    xfC[n][0] = x_cont
+                    xfC[n][1] = f_cont
+                    xfC[n][2] = Cf_cont
+                else:
+                    # shrinkage the entire simplex but not x_low
+                    for t in range(n):
+                        xfC[1+t][0] *= delta
+                        xfC[1+t][0] += (1-delta)*x_low
+        # sort xfC from low to high f(x) values
+        xfC = sorted(xfC,key=lambda elem: elem[1])
+        it = it+1
+        # termination condition:
+        f_mean = 0
+        for t in range(n+1):
+            f_mean += xfC[t][1]
+        f_mean *= 1/(float(n)+1)
+        error = 0
+        for t in range(n+1):
+            error += (xfC[t][1]-f_mean)**2
+        error *= 1/(float(n)+1)   
+
+    final_simplex = numpy.empty([n+1,n])
+    for t in range(n+1):
+        final_simplex[t] = xfC[t][0]
+    return OptimizeResult(fun=xfC[0][1], x=final_simplex[0], nit=it,\
+                            final_simplex=final_simplex)
+
+
 def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
                  c0=None,c1=1.4,c2=1.4,**unknown_options):
     # N = population size (has to be: N >= 2n+1; with n=problem size)
