@@ -728,16 +728,17 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
     gamma = 2
     delta = 0.5
     tol = 1e-12         # for check if sth x==0 -> check x<tol and x>-tol
-
-    N = len(x0)
+    
+    bounds = unknown_options['bounds']
+    n = len(x0)
     # generate initial_simplex:
-    initial_simplex = numpy.empty([N+1,N])
-    for t in range(N+1):
-        initial_simplex[i] = numpy.random.uniform(bounds.lb,bounds.ub) #in feasible region
+    initial_simplex = numpy.empty([n+1,n])
+    for t in range(n+1):
+        initial_simplex[t] = numpy.random.uniform(bounds.lb,bounds.ub) #in feasible region
     xfC = []                    # list with [[x1,f(x1),Cf(x1)],[x2,f(x2),Cf(x2)],...
     for t in range(n+1):
         xfC.append([initial_simplex[t],func(initial_simplex[t]),\
-                    Cf(initial_simplex[t],lb,ub)])
+                    Cf(initial_simplex[t],bounds.lb,bounds.ub)])
     
     # termination condition for first check in while loop:
     f_mean = 0
