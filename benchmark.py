@@ -81,7 +81,7 @@ def benchmark(OpticalSystem,meritfunctionrms,updatefunction,methods):
                 grad[i] = (func(x+h*E[i,:])-func(x-h*E[i,:])) / (2*h)
             return grad
 
-        backend.kwargs['jac'] = jacobian
+        #backend.kwargs['jac'] = jacobian
 
         """    
         # Functions for jacobian and hessian for scipy.minimize function:
