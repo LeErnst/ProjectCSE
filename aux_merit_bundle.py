@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import random
 import sys
+import copy
 
 # --- optical system and raytracing
 from pyrateoptics.raytracer.optical_system              import OpticalSystem
@@ -111,17 +112,17 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
         # Loop over all bundles
         for i in range(0, len(initialbundle)):
-            x = []
-            y = []
+            x = np.array([])
+            y = np.array([])
             # Loop over wavelenghts
             for j in range(0, len(initialbundle[0])):
-                my_initialbundle = initialbundle[i][j]
+                my_initialbundle = copy.copy(initialbundle[i][j])
                 rpaths = my_s.seqtrace(my_initialbundle, sysseq)
 
                 # put x and y value for ALL wavelengths in x and y array 
                 # to caculate mean
-                x.extend(rpaths[0].raybundles[-1].x[-1, 0, :])
-                y.extend(rpaths[0].raybundles[-1].x[-1, 1, :])
+                x = np.append(x, rpaths[0].raybundles[-1].x[-1, 0, :])
+                y = np.append(y, rpaths[0].raybundles[-1].x[-1, 1, :])
             
             # Add up all the mean values of the different wavelengths
             xmean = np.mean(x)
@@ -163,7 +164,7 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 # during an optimization run but it can happen that not all rays
                 # hit the image plane. Because of that a random number can be 
                 # drawn but there is no associated ray. the mask, which has then
-                # the wrong size will then cause an error.
+                # the wrong size will cause an error.
                 bundlenum = sample_num//(wavel*numrays)
                 wavenum   = (sample_num-wavel*numrays*bundlenum)//numrays
                 raynum    = sample_num-wavel*numrays*bundlenum-numrays*wavenum
@@ -178,7 +179,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
             for i in range(0, len(sample_initialbundle)):
 
                 # calculate the ray paths
-                rpaths = my_s.seqtrace(sample_initialbundle[i], sysseq)
+                bundle = copy.copy(sample_initialbundle[i])
+                rpaths = my_s.seqtrace(bundle, sysseq)
 
                 # append x and y for each bundle
                 x = np.append(x, rpaths[0].raybundles[-1].x[-1, 0, :])

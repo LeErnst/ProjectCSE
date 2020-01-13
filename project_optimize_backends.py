@@ -4,13 +4,14 @@ import random
 import numpy
 import scipy
 import sys
+import time
 from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
 from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
 from derivatives import grad, grad_pen, grad_lag, grad_log, hessian
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
-                                termcondition
+                                termcondition, plot2d
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=2.0,
@@ -349,16 +350,19 @@ class ProjectScipyBackend(Backend):
 def sgd(func, x0, args, 
         maxiter=500,
         stepsize=1e-9,
-        methods='nag',
+        methods='vanilla',
         gamma=0.9,
         gradtol=1500,
+        pathf=False,
         **kwargs):
 
-    gradient = kwargs['grad']
+    gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
-    iternum = 0
-    xk_1 = x0
-    fk_1 = func(x0)
+    iternum    = 0
+    xk_1       = x0
+    fk_1       = func(x0)
+    path       = numpy.empty(maxiter+1)
+    path[0]    = fk_1
 
     # momentum vector
     vk_1 = numpy.zeros(len(x0))
@@ -387,14 +391,22 @@ def sgd(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-
+        # update path
+        path[iternum] = fk
         # termination
         if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
 
-    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+    if (pathf==True):
+        if not (iternum==maxiter):
+            path = numpy.delete(path, range(iternum+1, maxiter)) 
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    return result
 
 
 def adam(func, x0, args, 
@@ -404,13 +416,16 @@ def adam(func, x0, args,
          beta2=0.99,
          epsilon=1e-2,
          gradtol=1500,
+         pathf=False,
          **kwargs):
 
-    gradient = kwargs['grad']
+    gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
-    iternum = 0
-    xk_1 = x0
-    fk_1 = func(x0)
+    iternum    = 0
+    xk_1       = x0
+    fk_1       = func(x0)
+    path       = numpy.empty(maxiter+1)
+    path[0]    = fk_1
 
     # 1st moment vector
     mk_1 = numpy.zeros(len(x0))
@@ -440,15 +455,23 @@ def adam(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-        print(xk-x0)
 
+        # update path
+        path[iternum] = fk
         # termination
         if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
 
-    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+    if (pathf==True):
+        if not (iternum==maxiter):
+            path = numpy.delete(path, range(iternum+1, maxiter)) 
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    return result
 
 
 def adamax(func, x0, args, 
@@ -459,14 +482,16 @@ def adamax(func, x0, args,
            thetaf=1e-1,
            p=None,
            gradtol=1500,
+           pathf=False,
            **kwargs):
 
-    gradient = kwargs['grad']
+    gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
-    iternum = 0
-    xk_1 = x0
-    fk_1 = func(x0)
-    ismin = False
+    iternum    = 0
+    xk_1       = x0
+    fk_1       = func(x0)
+    path       = numpy.empty(maxiter+1)
+    path[0]    = fk_1
 
     # 1st moment vector
     mk_1 = numpy.zeros(len(x0))
@@ -492,13 +517,22 @@ def adamax(func, x0, args,
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
 
+        # update path
+        path[iternum] = fk
         # termination
         if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
 
-    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+    if (pathf==True):
+        if not (iternum==maxiter):
+            path = numpy.delete(path, range(iternum+1, maxiter)) 
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    return result
 
 
 def adagrad(func, x0, args, 
@@ -506,15 +540,18 @@ def adagrad(func, x0, args,
             stepsize=1e-3,
             epsilon=1e-3,
             gradtol=1500,
+            pathf=False,
             **kwargs):
 
-    gradient = kwargs['grad']
+    gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
-    iternum = 0
-    dim = len(x0)
-    xk_1 = x0
-    fk_1 = func(x0)
-    G = numpy.zeros(dim)
+    iternum    = 0
+    dim        = len(x0)
+    xk_1       = x0
+    fk_1       = func(x0)
+    G          = numpy.zeros(dim)
+    path       = numpy.empty(maxiter+1)
+    path[0]    = fk_1
 
     while (1):
         # update iteration number
@@ -533,13 +570,22 @@ def adagrad(func, x0, args,
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
 
+        # update path
+        path[iternum] = fk
         # termination
         if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
 
-    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+    if (pathf==True):
+        if not (iternum==maxiter):
+            path = numpy.delete(path, range(iternum+1, maxiter)) 
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    return result
 
 
 def adadelta(func, x0, args, 
@@ -547,16 +593,19 @@ def adadelta(func, x0, args,
              roh=0.999,
              epsilon=1e-8,
              gradtol=1500,
+             pathf=False,
              **kwargs):
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
-    iternum = 0
-    dim = len(x0)
-    xk_1 = x0
-    fk_1 = func(x0)
-    Egk_1 = numpy.zeros(dim)
-    Exk_1 = numpy.zeros(dim)
+    iternum    = 0
+    dim        = len(x0)
+    xk_1       = x0
+    fk_1       = func(x0)
+    Egk_1      = numpy.zeros(dim)
+    Exk_1      = numpy.zeros(dim)
+    path       = numpy.empty(maxiter+1)
+    path[0]    = fk_1
 
     while (1):
         # update iteration number
@@ -584,13 +633,22 @@ def adadelta(func, x0, args,
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
 
+        # update path
+        path[iternum] = fk
         # termination
         if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
         xk_1 = xk
         fk_1 = fk
 
-    return OptimizeResult(fun=fk, x=xk, nit=iternum)
+    if (pathf==True):
+        if not (iternum==maxiter):
+            path = numpy.delete(path, range(iternum+1, maxiter)) 
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    return result
 
 
 def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
@@ -598,6 +656,7 @@ def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
     def scipy_stochastic_hybrid(func, x0, args=(), 
                                 options_s={},
                                 options_d={},
+                                plot=False,
                                 **kwargs):
 
         if (len(options_s)==0):
@@ -610,23 +669,32 @@ def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
 
         if (kwargs.get('stochagrad', None)==None):
             raise ValueError('Stochastic gradient is required!')
-        '''
-        # stochastic method to get fast in a surrounding of a minimum
+
+        print('---------------- start stochastic method ----------------')
+        # stochastic method to get in a surrounding of a minimum
         res_approx = stocha_opt_func(func, x0, args, 
                                      grad      =kwargs['grad'],
                                      stochagrad=kwargs['stochagrad'],
+                                     pathf=plot,
                                      **options_s)
-        '''
+
+        print('-------------- start deterministic method ---------------')
         # deterministic method to get convergence
-        res_sol = minimize(fun=func, x0=x0, args=args,
+        res_sol = minimize(fun=func, x0=res_approx.x, args=args,
                            method =scipy_opt_func,
                            jac    =kwargs['jac'],
                            options=options_d) 
 
-        # calculate the overall iteration number 
+        # set the result
         iternum = res_approx.nit + res_sol.nit
+        fun     = numpy.append(res_approx.fun, res_sol.fun)
+        result  = OptimizeResult(fun=fun, x=res_sol.x, nit=iternum)
+
+        # plot if desired
+        if (plot==True):
+            plot2d(range(len(fun)), fun, ylog=True)
         
-        return OptimizeResult(fun=res_sol.fun, x=res_sol.x, nit=iternum)
+        return result
     
     return scipy_stochastic_hybrid
 
