@@ -59,6 +59,8 @@ def benchmark(OpticalSystem,meritfunctionrms,updatefunction,methods):
         # Update constraints:
         backend.update_PSB(optimi)
         
+        # is done in upadate_PSB
+        """
         # Update parameter "bounds":
         # needed for scipy-algos: "L-BFGS-B","TNC","SLSQP","trust-constr"
         lb = np.empty([len(backend.bdry)/2])
@@ -69,6 +71,8 @@ def benchmark(OpticalSystem,meritfunctionrms,updatefunction,methods):
             ub[i] = backend.bdry[2*i+1]
         bound = scipy.optimize.Bounds(lb,ub)
         backend.kwargs['bounds'] = bound
+        """
+        bdry = backend.kwargs['bounds']
 
         # Update Jacobi-Matrix for case methodparam == 1:
         # (the other cases are treated in "project_minimize_backends")
@@ -137,7 +141,7 @@ def benchmark(OpticalSystem,meritfunctionrms,updatefunction,methods):
         # check if xfinal fulfills boundaries:
         check = 0
         for k in range (len(backend.res.x)):
-            if (backend.res.x[k] >= backend.bdry[2*k] and backend.res.x[k] <= backend.bdry[2*k+1]):
+            if (backend.res.x[k] >= bdry.lb[k] and backend.res.x[k] <= bdry.ub[k]):
                 check += 0
             else:
                 check += 1
