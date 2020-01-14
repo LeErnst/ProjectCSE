@@ -984,7 +984,7 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
 
 
 def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
-                 c0=None,c1=1.4,c2=1.4,**unknown_options):
+                 c0=None,c1=1.0,c2=2.0,**unknown_options):
     # N = population size (has to be: N >= 2n+1; with n=problem size)
     # vel_max = maximal velocity of a particle
     # c0,c1 and c2 are variables for updating the velocity of the particles
@@ -999,9 +999,9 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
         x_neu = deepcopy(x)
         for t in range(len(x)):
             if (x[t]<lb[t]):
-                x_neu[t] = lb[t] + 2*vel_max[t]
+                x_neu[t] = lb[t] #+ 2*vel_max[t]
             if (x[t]>ub[t]):
-                x_neu[t] = ub[t] - 2*vel_max[t]
+                x_neu[t] = ub[t] #- 2*vel_max[t]
         return x_neu
 
     def Cf(x,lb,ub):                        # Constraint fitness priority-based ranking method
@@ -1239,15 +1239,19 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
     while (k <= maxiter):
         #Evaluate solutions and apply Repair Method if not in feasible region:
         liste = []                            # list to safe (pos(i),f(pos(i)),...
+        infeasible = 0
         for i in range(N):
             # check if solution is in feasibale region, else apply Repair Method
             if not (numpy.all(swarm[i].pos>=bounds.lb) and \
                     numpy.all(swarm[i].pos<=bounds.ub)):
                 repairedPos = rm(swarm[i].pos,bounds.lb,bounds.ub,vel_max)
                 swarm[i].updatePos(repairedPos)
+                swarm[i].vel = numpy.zeros(n)       # vel=0 so that the particles doesn't go in infeasible region again
+                infeasible += 1
             # write tupel (i,f(i)) in liste:
             temp = [i,swarm[i].pos_f]
             liste.append(temp)
+        print("repaired particles = ", infeasible)
         # sort liste from low func values to high func values:
         liste = sorted(liste,key=lambda elem: elem[1])
         # Update xBest and xBest_f if solution is better:
@@ -1300,6 +1304,23 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             swarm[liste[second][0]].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)
 
         k = k+1
+
+        # Untersuchung Verteilung der Partikel:
+        verteilung = numpy.zeros([n,3])
+        for q in range (n):
+            verteilung[q,1] = bounds.lb[q]
+            verteilung[q,2] = bounds.ub[q]
+            summe = 0
+            for p in range(N):
+                summe += swarm[p].pos[q]
+            middle = summe/N
+            maxi = 0
+            for p in range(N):
+                temp = abs(middle-swarm[p].pos[q])
+                if (temp >= maxi):
+                    maxi = temp
+            verteilung[q,0] = maxi
+        print("verteilung = ",verteilung)
 
 def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     # algorithm based on population based incremental learning
