@@ -126,7 +126,7 @@ rays_dict = {"startz":[-8], "starty": [0], "radius": [8],
              "rasterobj":raster.RectGrid()}
 wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
 numrays = 50
-sample_param = 'bundle'
+sample_param = 'wave'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                                      numrays, wavelength, 
@@ -186,16 +186,17 @@ def osupdate(my_s):
 hybrid_method = get_scipy_stochastic_hybrid(stocha_opt_func=adam,
                                             scipy_opt_func ='TNC') 
 
-options={'gtol'     : 1e-2,
+options={'gtol'     : 1e+1,
+         'plot'     : True, 
          'options_d': {'maxiter': 100, 
                        'xtol'   : 1e-5, 
                        'ftol'   : 1e-5,
-                       'gtol'   : 1e-2,
+                       'gtol'   : 1e+0,
                        'disp'   : True},
          'options_s': {'maxiter' : 100, 
                        'stepsize': 1e-2, 
                        'beta1'   : 0.1, 
-                       'beta2'   : 0.99,
+                       'beta2'   : 0.79,
                        'gradtol' : 1500,
                        'roh'     : 0.999,
                        'epsilon' : 1e-2}}
