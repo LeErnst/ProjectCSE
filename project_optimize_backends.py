@@ -1452,6 +1452,98 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
 
         k = k+1
 
+def PopBasIncLearning(func,x0,args=(),Ng=100,m=10,**unknown_options):
+    # algorithm based on population based incremental learning
+    # Np = population size; Ng = number of generations; 
+    # m = subintervalls between lower bound and upper bound
+    tolError = 1e-3
+    stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
+    n = len(x0)         # problem size
+    Np = n*m*5          # population size
+    xbest = x0
+    fbest = func(xbest)
+    bounds = unknown_options['bounds']
+
+    # vector delta is needed to define the subintervalls
+    delta = numpy.empty(n)
+    for i in range(n):
+        delta[i] = (bounds.ub[i]-bounds.lb[i])/float(m)
+
+    # initializing probability matrix
+    P = numpy.empty([n,m])
+    for i in range(n):
+        for j in range(m):
+            P[i,j] = 1/float(m)
+
+    stopTol = 0
+    it = 0
+    
+    while it<Ng and stopTol<stopNum:         # main loop
+        # Update population:
+        R = [[] for i in range(n)]          # initialization of population list R
+        for i in range(n):                  # loop over all components of x
+            ctr = 0
+            for j in range(m):              # loop over all subintervalls
+                for t in range(int(math.floor(Np*P[i,j]))):
+                    #rand*(b-a)+a to create a random number betwenn [a,b]
+                    a = bounds.lb[i]+j*delta[i]
+                    b = bounds.lb[i]+(j+1)*delta[i]
+                    R[i].append(random.random()*(b-a)+a)
+                    ctr += 1
+            while ctr<Np:
+                a = bounds.lb[i]
+                b = bounds.ub[i]
+                R[i].append(random.random()*(b-a)+a)     # wo dazu ordnen?
+                ctr += 1
+        
+        # random shuffle of all lines in R
+        for i in range(n):
+            random.shuffle(R[i])
+
+        # determine function values of individuals:
+        F = numpy.empty(Np)
+        for w in range(Np):
+            Ind = numpy.empty(n)
+            for i in range(n):
+                Ind[i] = R[i][w]                # all x-components of one individual
+            F[w] = func(Ind)
+            if (F[w]<=fbest):
+                if (abs(F[w]-fbest)>tolError):
+                    stopTol = 0
+                fbest = F[w]
+                xbest = Ind
+        stopTol += 1    
+        print("fbest = ", fbest)
+        # find out in which interval xbest is:
+        r = numpy.empty(n)          # safes the interval number j of xbest[i]
+        for i in range(n):
+            for j in range(m):
+                if(xbest[i]>=bounds.lb[i]+j*delta[i] and \
+                                xbest[i]<=bounds.lb[i]+(j+1)*delta[i]):
+                    r[i] = j
+                    break
+
+        # Updating der Probability Matrix:
+        P_s = numpy.empty([n,m])
+        for i in range(n):
+            for j in range(m):
+                L = 0.5*math.exp(-(j-r[i])**2)      # Learning rate
+                P_s[i,j] = (1-L)*P[i,j]+L
+
+        # Normalizing each row of P_s -> new P
+        for i in range(n):
+            summe = 0
+            for j in range(m):
+                summe += P_s[i,j]
+            for j in range(m):
+                P[i,j] = (1/summe) * P_s[i,j]
+
+        it += 1
+                
+
+    return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
+
+
 
     """
         # loop over all particles:
