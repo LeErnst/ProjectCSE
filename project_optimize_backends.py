@@ -1222,7 +1222,11 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
     
     # Initialization of all particles with Position and velocity:
     swarm = []
-    for i in range(N):
+    pos0 = x0                           # initial x0 ist part of swarm
+    vel0 = random.random() * vel_max
+    swarm.append(particle(pos0,vel0))
+
+    for i in range(N-1):
         pos0 = numpy.random.uniform(bounds.lb,bounds.ub)    # start position in feasible region
         vel0 = random.random() * vel_max                    # random start velocity
         swarm.append(particle(pos0,vel0))
@@ -1252,6 +1256,8 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
                 stopCrit = 0
             xBest = swarm[liste[0][0]].pos
             xBest_f = liste[0][1]
+        
+        print("bestes f = ", xBest_f)
 
         stopCrit = stopCrit+1
 
@@ -1267,9 +1273,9 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
         final_simplex = nelder_mead_con(initial_simplex,func,Cf,bounds.lb,bounds.ub)
         # Update (n+1)th particle:
         for i in range(n+1):
-            particle = liste[i][0]
-            swarm[particle].updatePos(final_simplex[i])
-            liste[i][1] = swarm[particle].pos_f
+            parti = liste[i][0]
+            swarm[parti].updatePos(final_simplex[i])
+            liste[i][1] = swarm[parti].pos_f
 
         # Update liste:
         liste = sorted(liste,key=lambda elem: elem[1])
