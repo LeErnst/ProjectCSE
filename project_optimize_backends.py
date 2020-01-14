@@ -983,8 +983,8 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
                             final_simplex=final_simplex)
 
 
-def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
-                 c0=None,c1=2.0,c2=2.0,**unknown_options):
+def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
+                 c0=None,c1=1.4,c2=1.4,**unknown_options):
     # N = population size (has to be: N >= 2n+1; with n=problem size)
     # vel_max = maximal velocity of a particle
     # c0,c1 and c2 are variables for updating the velocity of the particles
@@ -1022,14 +1022,14 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             Cf += weight*C[t]
         return Cf
 
-    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,maxiter=50,tolError=1e-8):
+    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,MaxIt=100,tolError=1e-4):
     # Nelder-Mead for constraint optimization
     # initial_simplex should be array of shape (N+1,N) with N: problem size
         alpha = 1
         beta = 0.5
         gamma = 2
         delta = 0.5
-        tol = 1e-12
+        tol = 1e-8
 
         n = len(initial_simplex[0])
         xfC = []                    # list with [[x1,f(x1),Cf(x1)],[x2,f(x2),Cf(x2)],...
@@ -1048,7 +1048,7 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
         error *= 1/(float(n)+1)
 
         it = 1
-        while (it <= maxiter and error > tolError):
+        while (it <= MaxIt and error > tolError):
             # sort xfC from low to high f(x) values
             xfC = sorted(xfC,key=lambda elem: elem[1])
             # Reflection:
@@ -1233,7 +1233,6 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
     stopCrit = 0            # counter for stopping criteria
 
     while (k <= maxiter):
-        test = 0
         #Evaluate solutions and apply Repair Method if not in feasible region:
         liste = []                            # list to safe (pos(i),f(pos(i)),...
         for i in range(N):
@@ -1241,17 +1240,12 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             if not (numpy.all(swarm[i].pos>=bounds.lb) and \
                     numpy.all(swarm[i].pos<=bounds.ub)):
                 repairedPos = rm(swarm[i].pos,bounds.lb,bounds.ub,vel_max)
-                test += 1
                 swarm[i].updatePos(repairedPos)
             # write tupel (i,f(i)) in liste:
             temp = [i,swarm[i].pos_f]
             liste.append(temp)
         # sort liste from low func values to high func values:
         liste = sorted(liste,key=lambda elem: elem[1])
-        print("test = ",test)
-        print("best value = ",liste[0][1])
-        if numpy.all(swarm[liste[0][0]].pos>=bounds.lb) and numpy.all(swarm[liste[0][0]].pos<=bounds.ub):
-            print("bounds are good")
         # Update xBest and xBest_f if solution is better:
         if (liste[0][1] <= xBest_f):
             if (abs(liste[0][1]-xBest_f)>1e-3):  # check if global fBest is changing sifnificantly
@@ -1260,10 +1254,9 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
             xBest_f = liste[0][1]
 
         stopCrit = stopCrit+1
-        print("Best = ",xBest_f)
 
         # check stopping criteria:
-        if (k==maxiter or stopCrit>=5):
+        if (k==maxiter):
             return OptimizeResult(fun=xBest_f, x=xBest, nit = k)
             break
 
@@ -1302,14 +1295,14 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
 
         k = k+1
 
-def PopBasIncLearning(func,x0,args=(),Ng=100,m=10,**unknown_options):
+def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     # algorithm based on population based incremental learning
     # Np = population size; Ng = number of generations; 
     # m = subintervalls between lower bound and upper bound
     tolError = 1e-3
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
-    Np = n*m*5          # population size
+    Np = n*m*20          # population size
     xbest = x0
     fbest = func(xbest)
     bounds = unknown_options['bounds']
@@ -1328,7 +1321,8 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=10,**unknown_options):
     stopTol = 0
     it = 0
     
-    while it<Ng and stopTol<stopNum:         # main loop
+    #while it<Ng and stopTol<stopNum:  
+    while it<Ng:
         # Update population:
         R = [[] for i in range(n)]          # initialization of population list R
         for i in range(n):                  # loop over all components of x
@@ -1363,7 +1357,9 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=10,**unknown_options):
                 fbest = F[w]
                 xbest = Ind
         stopTol += 1    
+
         print("fbest = ", fbest)
+
         # find out in which interval xbest is:
         r = numpy.empty(n)          # safes the interval number j of xbest[i]
         for i in range(n):
