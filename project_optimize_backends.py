@@ -1302,13 +1302,14 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=50,\
 
         k = k+1
 
-def PopBasIncLearning(func,x0,args=(),Np=20,Ng=100,m=10,**unknown_options):
+def PopBasIncLearning(func,x0,args=(),Ng=100,m=10,**unknown_options):
     # algorithm based on population based incremental learning
     # Np = population size; Ng = number of generations; 
     # m = subintervalls between lower bound and upper bound
     tolError = 1e-3
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
+    Np = n*m*5          # population size
     xbest = x0
     fbest = func(xbest)
     bounds = unknown_options['bounds']
@@ -1327,7 +1328,7 @@ def PopBasIncLearning(func,x0,args=(),Np=20,Ng=100,m=10,**unknown_options):
     stopTol = 0
     it = 0
     
-    while it<Ng or stopTol<stopNum:         # main loop
+    while it<Ng and stopTol<stopNum:         # main loop
         # Update population:
         R = [[] for i in range(n)]          # initialization of population list R
         for i in range(n):                  # loop over all components of x
@@ -1362,6 +1363,31 @@ def PopBasIncLearning(func,x0,args=(),Np=20,Ng=100,m=10,**unknown_options):
                 fbest = F[w]
                 xbest = Ind
         stopTol += 1    
+        print("fbest = ", fbest)
+        # find out in which interval xbest is:
+        r = numpy.empty(n)          # safes the interval number j of xbest[i]
+        for i in range(n):
+            for j in range(m):
+                if(xbest[i]>=bounds.lb[i]+j*delta[i] and \
+                                xbest[i]<=bounds.lb[i]+(j+1)*delta[i]):
+                    r[i] = j
+                    break
+
+        # Updating der Probability Matrix:
+        P_s = numpy.empty([n,m])
+        for i in range(n):
+            for j in range(m):
+                L = 0.5*math.exp(-(j-r[i])**2)      # Learning rate
+                P_s[i,j] = (1-L)*P[i,j]+L
+
+        # Normalizing each row of P_s -> new P
+        for i in range(n):
+            summe = 0
+            for j in range(m):
+                summe += P_s[i,j]
+            for j in range(m):
+                P[i,j] = (1/summe) * P_s[i,j]
+
         it += 1
                 
 
