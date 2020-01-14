@@ -183,23 +183,25 @@ def osupdate(my_s):
 #                                  options={'maxiter': 100 , 'xatol': 1e-5,\
 #                                           'fatol': 1e-5})
 
-hybrid_method = get_scipy_stochastic_hybrid(stocha_opt_func=adam,
-                                            scipy_opt_func ='TNC') 
+hybrid_method = get_scipy_stochastic_hybrid(stocha_opt_func=sgd,
+                                            scipy_opt_func ='Newton-CG') 
 
-options={'gtol'     : 1e+1,
+options={'gtol'     : 1e+2,
          'plot'     : True, 
-         'options_d': {'maxiter': 100, 
-                       'xtol'   : 1e-5, 
+         'options_d': {'maxiter': 150, 
+                       'xtol'   : 1e-9, 
                        'ftol'   : 1e-5,
-                       'gtol'   : 1e+0,
+                       'gtol'   : 1e+1,
                        'disp'   : True},
          'options_s': {'maxiter' : 100, 
-                       'stepsize': 1e-2, 
+                       'stepsize': 1e-9, 
                        'beta1'   : 0.1, 
-                       'beta2'   : 0.79,
-                       'gradtol' : 1500,
+                       'beta2'   : 0.99,
+                       'gradtol' : 1000,
                        'roh'     : 0.999,
-                       'epsilon' : 1e-2}}
+                       'epsilon' : 1e-3,
+                       'gamma'   : 0.9,
+                       'methods' : 'nag'}}
 
 # ---- stochastic gradient descent
 opt_backend = ProjectScipyBackend(optimize_func=hybrid_method,

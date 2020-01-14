@@ -5,6 +5,8 @@ import numpy
 import scipy
 import sys
 import time
+import matplotlib.pyplot as plt
+import matplotlib
 from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
 from pyrateoptics.core.log import BaseLogger
@@ -356,6 +358,30 @@ def sgd(func, x0, args,
         pathf=False,
         **kwargs):
 
+    '''
+    Stochastic gradient descent with options. 
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    methods  - the method options, possible:
+               vanilla : sgd
+               momentum: sgd with momentum
+               nag     : nesterovs accelerated gradient
+    gamma    - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Ruder, Sebastian. "An overview of gradient descent optimization algorithms."
+    arXiv preprint arXiv:1609.04747 (2016).
+    '''
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
     iternum    = 0
@@ -389,8 +415,12 @@ def sgd(func, x0, args,
         fk = func(xk)
         gk = gradient(xk)
         gknorm = numpy.linalg.norm(gk, numpy.inf)
+
+        # debugging
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+        printArray('delta_xk =', vk)
+
         # update path
         path[iternum] = fk
         # termination
@@ -418,6 +448,29 @@ def adam(func, x0, args,
          gradtol=1500,
          pathf=False,
          **kwargs):
+
+    '''
+    Adaptive moment estimation - based on sgd
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    beta1    - parameter for the momentum
+    beta2    - parameter for the momentum
+    epsilon  - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Kingma, Diederik P., and Jimmy Ba. "Adam: A method for stochastic 
+    optimization." arXiv preprint arXiv:1412.6980 (2014).
+    '''
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
@@ -447,6 +500,9 @@ def adam(func, x0, args,
         mk_hat = mk/(1-numpy.power(beta1,iternum))
         # compute bias-corrected first moment estimate
         vk_hat = vk/(1-numpy.power(beta2,iternum))
+
+        printArray('stepsize*mk_hat/(sqrt(vk_hat)+epsilon) =',stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon))
+
         # iteration rule
         xk = xk_1 - stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon)
 
@@ -479,11 +535,31 @@ def adamax(func, x0, args,
            stepsize=1e-2,
            beta1=0.09,
            beta2=0.99,
-           thetaf=1e-1,
-           p=None,
            gradtol=1500,
            pathf=False,
            **kwargs):
+
+    '''
+    Adaptive moment estimation - based on Adam: Adam generalized to p-norms 
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    beta1    - parameter for the momentum
+    beta2    - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Kingma, Diederik P., and Jimmy Ba. "Adam: A method for stochastic 
+    optimization." arXiv preprint arXiv:1412.6980 (2014).
+    '''
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
@@ -516,6 +592,8 @@ def adamax(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+        printArray('delta_x =', (stepsize/(1-numpy.power(beta1,iternum)))*mk/vk)
+
 
         # update path
         path[iternum] = fk
@@ -543,6 +621,28 @@ def adagrad(func, x0, args,
             pathf=False,
             **kwargs):
 
+    '''
+    Adaptive gradient estimation
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    epsilon  - parameter for the gradient
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Duchi, John, Elad Hazan, and Yoram Singer. "Adaptive subgradient methods for
+    online learning and stochastic optimization." Journal of Machine Learning 
+    Research 12.Jul (2011): 2121-2159.
+    '''
+
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
     iternum    = 0
@@ -569,6 +669,7 @@ def adagrad(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+        printArray('stepsize*(gk/(sqrt(G)+epsilon)) =', stepsize*(gk/(numpy.sqrt(G)+epsilon)))
 
         # update path
         path[iternum] = fk
@@ -595,6 +696,26 @@ def adadelta(func, x0, args,
              gradtol=1500,
              pathf=False,
              **kwargs):
+
+    '''
+    Adaptive learning rate methode (learning rate = stepsize)
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    epsilon  - parameter for the gradient
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Zeiler, Matthew D. "ADADELTA: an adaptive learning rate method." arXiv 
+    preprint arXiv:1212.5701 (2012).
+    '''
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
@@ -653,11 +774,40 @@ def adadelta(func, x0, args,
 
 def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
 
+    '''
+    Method to generate a hybrid optimization algorithm in a generic fashion.
+
+    Input:
+    stocha_opt_func : A desired stochastic optimization function, which is then
+                      used to get in a surrounding of a minimum (pointer to a 
+                      function)
+    scipy_opt_func  : A desired scipy optimization method, which is then used to
+                      generate convergence to the minimum (string of a scipy 
+                      method)
+
+    Output: hybrid optimization algorithm 
+    '''
+
     def scipy_stochastic_hybrid(func, x0, args=(), 
                                 options_s={},
                                 options_d={},
                                 plot=False,
                                 **kwargs):
+
+        '''
+        A hybrid optimization algorithm
+ 
+        Input:
+        func      - function to be optimized
+        x0        - initial value
+        args      - additional arguments for the func, is ignored within this 
+                    algo, but scipy requires this
+        options_s - solver options for the stochastic optimization function
+        options_d - solver options for the deterministic optimization function
+        plot      - iterations-functionvalue-plot if it is true
+
+        Output: OptimizeResult-object from scipy
+        '''
 
         if (len(options_s)==0):
             raise ValueError('There are no solver options for the stochastic \
@@ -692,7 +842,7 @@ def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
 
         # plot if desired
         if (plot==True):
-            plot2d(range(len(fun)), fun, ylog=True)
+            plot2d(range(len(fun)), fun, ylog=True, save=True)
         
         return result
     

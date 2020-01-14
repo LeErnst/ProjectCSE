@@ -337,8 +337,11 @@ def error2squared(x, x_ref, y, y_ref, penalty=False):
     '''
     computes the squared
     '''
-    if penalty:
-        res = np.sum((x - x_ref)**2 + (y - y_ref)**2) + 10.*math.exp(-len(x))
+    if (penalty):
+        if (penalty==True):
+            penalty=50.
+        res = np.sum((x - x_ref)**2 + (y - y_ref)**2)\
+              + penalty*math.exp(-len(x))
     else:
         res = np.sum((x - x_ref)**2 + (y - y_ref)**2) 
 
@@ -351,8 +354,10 @@ def error1(x, x_ref, y, y_ref, penalty=False):
     L1-error = sum_{i=1 to #rays}(||(x_i, y_i)^T - (x_ref, y_ref)^T||_1)
     '''
     if penalty:
+        if (penalty==True):
+            penalty=50.
         res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))\
-              + 10.*math.exp(-len(x))
+              + penalty*math.exp(-len(x))
     else:
         res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))
 
@@ -609,9 +614,6 @@ def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
     epsilon = math.pow(thetaf, 1/2)*(1+np.linalg.norm(xk, p))
     delta   = math.pow(thetaf, 1/3)*(1+np.absolute(fk))
 
-    print('fk      = %7.4f' %(fk))
-#    printArray('gk      =\n', gk)
-    
     # In the literature it is not the absolute value of fk_1-fk, but for 
     # algorithm which does not go to a descent direction in every step the 
     # absolute value is necessary
@@ -639,7 +641,10 @@ def plot2d(xarray, yarray,
            ylog=False,
            grid=True,
            linewidth=2,
-           linestyle='-o'):
+           linestyle='-o',
+           save=False,
+           name='plot2d.png',
+           show=False):
 
     plt.figure()
     plt.plot(xarray, yarray, linestyle, lw=linewidth, label=legend)
@@ -665,7 +670,11 @@ def plot2d(xarray, yarray,
     plt.legend(loc=loclegend, prop={'size': fontlegend})
     # set grid
     plt.grid(grid)
+    # safe 
+    if (save==True):
+        plt.savefig(name)
     # plot
-    plt.show()
+    if (show==True):
+        plt.show()
 
 
