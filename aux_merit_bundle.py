@@ -85,7 +85,7 @@ def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10,
 
 def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                      wavelength=[0.587e-3], whichmeritfunc='standard',
-                     error='error2', sample_param='wave', penalty=False):
+                     error='error2', sample_param='wave', penalty=True):
     """
     initializes the initialBundles and forms the meritfunction
     this is necessary as the meritfunction needs the initalbundle, but in the 
