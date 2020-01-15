@@ -76,7 +76,7 @@ class inout:
                 "numrays","wavelength","raster"]
         self.surfaces=np.genfromtxt(self.globpath+"surface_input",dtype=None,\
                 comments="#")
-        self.rays=np.genfromtxt(self.globpath+"bundle_input_alt",dtype=None,\
+        self.rays=np.genfromtxt(self.globpath+"bundle_input",dtype=None,\
                 comments="#").tolist()
         self.material=[]
         self.SurfNameList=[]
