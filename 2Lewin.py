@@ -2,6 +2,7 @@
 # including the necessary classes, functions and libraries
 # by patrick, leandro, michael, lewin
 
+################## test fuer patrick
 
 # lewin has created this file for testing some algorithms and to not change the 
 # original file (01_..), which is the main file for patricks changes (outsourcing
