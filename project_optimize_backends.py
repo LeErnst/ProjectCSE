@@ -149,24 +149,27 @@ class ProjectScipyBackend(Backend):
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
+                if (iterNum>=5):
+                    print('\n----------- end of penalty run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
                      and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
                     print('\n----------- end of penalty run -----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif (iterNum>=50):
-                    print('\n----------- end of penalty run -----------')
-                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
-                    break
+                elif (numpy.linalg.norm(grad_total(xk)<self.gtol) and
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
+                    print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
+                    print('Algorithm did not reach a Minimum!')
+                    print('Keep Lambda and Tau and continue with Algorithm')
                 else: # xk is not in the feasible set -> update tauk
                     # update tau
                     self.tauk = 7*self.tauk 
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
 
                 # update xk-1 
                 #xk_1 = xk
@@ -237,27 +240,29 @@ class ProjectScipyBackend(Backend):
                 break
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
+                if (iterNum>=5):
+                    print('\n----------- end of penalty lagrange run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
                      and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
                     print('\n---------- end of penalty lagrange run ----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif (iterNum>=50):
-                    print('\n----------- end of penalty run -----------')
-                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
-                    break
+                elif (numpy.linalg.norm(grad_total(xk)<self.gtol) and 
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
+                    print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
+                    print('Keep Lambda and Tau and continue with Algorithm')
                 else: # xk is not in the feasible set -> update tauk and lambdak
                     # update tau
                     self.tauk = 7*self.tauk
                     # update lambda
                     self.lamk = numpy.add(self.lamk, 
                                           self.tauk*eval_h(xk, self.bdry))
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                 # update xk-1
                 xk_1 = xk
 
@@ -316,17 +321,27 @@ class ProjectScipyBackend(Backend):
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
-                    print('\n---------- end of log barrier run----------')
+                if (iterNum>=5):
+                    print('\n----------- end of log run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
+                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
+                    print('\n---------- end of log run ----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
+                elif (numpy.linalg.norm(grad_total(xk)<self.gtol) and 
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
+                    print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
+                    print('Keep my and continue with Algorithm')
+                    break
                 else: # xk is not in the feasible set -> update my
                     # update my
                     self.my = self.my/10
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
 
                 # update xk-1
                 xk_1 = xk
