@@ -121,9 +121,6 @@ class ProjectScipyBackend(Backend):
                 # store the grad-function in options
                 self.options['grad'] = grad_total
                 
-                # for benchmark
-                #self.kwargs['jac'] = grad_total
- 
                 # update iteration number
                 iterNum += 1
                 print('\niteration number = %d' % (iterNum))
@@ -207,9 +204,6 @@ class ProjectScipyBackend(Backend):
                 # store the grad-function in options
                 self.options['grad']= grad_total
             
-                # for benchmark
-                #self.kwargs['jac'] = grad_total
-
                 # update iteration number
                 iterNum += 1
 
@@ -240,6 +234,7 @@ class ProjectScipyBackend(Backend):
 
                 printArray('x_k =', res.x, point=points)
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
+                break
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
                 if ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
@@ -297,9 +292,6 @@ class ProjectScipyBackend(Backend):
                 # store the grad-function in options
                 self.options['grad']= grad_total
 
-                # for benchmark
-                self.kwargs['jac'] = grad_total
-
                # update iteration number
                 iterNum += 1
                 print('\niteration number = %d' % (iterNum))
@@ -340,8 +332,7 @@ class ProjectScipyBackend(Backend):
                 xk_1 = xk
 
         else:
-            print('Methodparam not found!')
-            sys.exit()
+            raise ValueError('Methodparam is not found!')
 
         printArray('x_k =', res.x, point=points)
         print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
@@ -356,6 +347,8 @@ def sgd(func, x0, args,
         gamma=0.9,
         gradtol=1500,
         pathf=False,
+        plot=False,
+        plotset={},
         **kwargs):
 
     '''
@@ -372,9 +365,12 @@ def sgd(func, x0, args,
                vanilla : sgd
                momentum: sgd with momentum
                nag     : nesterovs accelerated gradient
+               gradient: gradient decent with real gradient
     gamma    - parameter for the momentum
     gradtol  - tolerance for real gradient termination condition
     pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
 
     Output: OptimizeResult-object from scipy
 
@@ -399,15 +395,19 @@ def sgd(func, x0, args,
 
         # choose the method
         if (methods == 'vanilla'):
-            vk = stepsize*stochagrad(xk_1)
+            # vanilla sgd
+            vk   = stepsize*stochagrad(xk_1)
         if (methods == 'momentum'):
             # momentum vector
-            vk = gamma*vk_1+stepsize*stochagrad(xk_1)
+            vk   = gamma*vk_1+stepsize*stochagrad(xk_1)
             vk_1 = vk
         if (methods == 'nag'):
             # nesterov accelerated gradient
-            vk = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
+            vk   = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
             vk_1 = vk
+        if (methods == 'gradient'):
+            # gradient descent
+            vk   = stepsize*gradient(xk_1)
 
         # iteration rule
         xk = xk_1 - vk 
@@ -419,7 +419,6 @@ def sgd(func, x0, args,
         # debugging
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-        printArray('delta_xk =', vk)
 
         # update path
         path[iternum] = fk
@@ -429,12 +428,20 @@ def sgd(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
 
     return result
 
@@ -447,6 +454,8 @@ def adam(func, x0, args,
          epsilon=1e-2,
          gradtol=1500,
          pathf=False,
+         plot=False,
+         plotset={},
          **kwargs):
 
     '''
@@ -464,6 +473,8 @@ def adam(func, x0, args,
     epsilon  - parameter for the momentum
     gradtol  - tolerance for real gradient termination condition
     pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
 
     Output: OptimizeResult-object from scipy
 
@@ -501,7 +512,7 @@ def adam(func, x0, args,
         # compute bias-corrected first moment estimate
         vk_hat = vk/(1-numpy.power(beta2,iternum))
 
-        printArray('stepsize*mk_hat/(sqrt(vk_hat)+epsilon) =',stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon))
+#        printArray('stepsize*mk_hat/(sqrt(vk_hat)+epsilon) =',stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon))
 
         # iteration rule
         xk = xk_1 - stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon)
@@ -520,12 +531,19 @@ def adam(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
 
     return result
 
@@ -537,6 +555,8 @@ def adamax(func, x0, args,
            beta2=0.99,
            gradtol=1500,
            pathf=False,
+           plot=False,
+           plotset={},
            **kwargs):
 
     '''
@@ -553,6 +573,8 @@ def adamax(func, x0, args,
     beta2    - parameter for the momentum
     gradtol  - tolerance for real gradient termination condition
     pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
 
     Output: OptimizeResult-object from scipy
 
@@ -592,7 +614,7 @@ def adamax(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-        printArray('delta_x =', (stepsize/(1-numpy.power(beta1,iternum)))*mk/vk)
+#        printArray('delta_x =', (stepsize/(1-numpy.power(beta1,iternum)))*mk/vk)
 
 
         # update path
@@ -603,12 +625,20 @@ def adamax(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
 
     return result
 
@@ -619,6 +649,8 @@ def adagrad(func, x0, args,
             epsilon=1e-3,
             gradtol=1500,
             pathf=False,
+            plot=False,
+            plotset={},
             **kwargs):
 
     '''
@@ -634,6 +666,8 @@ def adagrad(func, x0, args,
     epsilon  - parameter for the gradient
     gradtol  - tolerance for real gradient termination condition
     pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
 
     Output: OptimizeResult-object from scipy
 
@@ -669,7 +703,7 @@ def adagrad(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-        printArray('stepsize*(gk/(sqrt(G)+epsilon)) =', stepsize*(gk/(numpy.sqrt(G)+epsilon)))
+#        printArray('stepsize*(gk/(sqrt(G)+epsilon)) =', stepsize*(gk/(numpy.sqrt(G)+epsilon)))
 
         # update path
         path[iternum] = fk
@@ -679,12 +713,20 @@ def adagrad(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
 
     return result
 
@@ -695,6 +737,8 @@ def adadelta(func, x0, args,
              epsilon=1e-8,
              gradtol=1500,
              pathf=False,
+             plot=False,
+             plotset={},
              **kwargs):
 
     '''
@@ -709,6 +753,8 @@ def adadelta(func, x0, args,
     epsilon  - parameter for the gradient
     gradtol  - tolerance for real gradient termination condition
     pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
 
     Output: OptimizeResult-object from scipy
 
@@ -762,12 +808,19 @@ def adadelta(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
 
     return result
 

@@ -627,6 +627,7 @@ def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
 
 
 def plot2d(xarray, yarray,
+           fig=1,
            title='',
            fonttitle=14,
            xlabel='',
@@ -644,9 +645,10 @@ def plot2d(xarray, yarray,
            linestyle='-o',
            save=False,
            name='plot2d.png',
-           show=False):
+           show=False,
+           *args):
 
-    plt.figure()
+    plt.figure(fig)
     plt.plot(xarray, yarray, linestyle, lw=linewidth, label=legend)
     # axis
     plt.xlabel(xlabel, fontsize=fontaxis)
