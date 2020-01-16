@@ -72,16 +72,17 @@ class inout:
         #Take care if you change the bundle_input file. The order below
         #hast to represent the order of the bundle_input file
         self.ray_order=["startx","starty","startz",\
-                "radius","anglex","angley",\
-                "numrays","wavelength","raster"]
+                "radius","anglex","angley","raster"]
         self.surfaces=np.genfromtxt(self.globpath+"surface_input",dtype=None,\
                 comments="#")
         self.rays=np.genfromtxt(self.globpath+"bundle_input",dtype=None,\
                 comments="#").tolist()
+        self.rays_spec=np.genfromtxt(self.globpath+"bundle_spec",dtype=None,\
+                comments="#").tolist()
+        self.numrays=self.rays_spec[0]
+        self.wavelengths=self.convert_2_list(self.rays_spec[1])
         self.material=[]
         self.SurfNameList=[]
-        #take care: it is necessaray that here stands the "normal" variable name 
-        #added with an var. all possible varialbe items have to mentioned below 
 
     def set_add(self):
         self.mode=0
@@ -187,7 +188,10 @@ class inout:
     def get_sufval(self, name, index):
         return self.surfaces[index][self.surface_order.index(name)]
 
-    def get_rayval(self,name):
+    def get_rayval(self, name, index):
+        return self.rays[index][self.ray_order.index(name)]
+
+    def get_rayval_tupel(self, name):
         return self.rays[self.ray_order.index(name)]
 
     #this function creates for every surface (defined in the surface_input file) one coordinate system, and returns a list of them
@@ -315,19 +319,47 @@ class inout:
         return sysseq 
 
     #returns the dictionary which represents the ray bundles 
+    #def get_rays_dict(self):
+    #    rays_dict={}
+    #    for i in range(len(self.ray_order)):
+    #        value=self.get_rayval(self.ray_order[i])
+    #        name=self.ray_order[i]
+    #        if isinstance(value,int):
+    #            rays_dict[name]=[value]
+    #        elif name=="raster":
+    #            if(value=="RectGrid"):
+    #                rays_dict[name]=raster.RectGrid()
+    #        else:    
+    #            rays_dict[self.ray_order[i]]=self.convert_2_list(value)
+    #    return rays_dict 
+    
+    #returns a list with all bundle dictionarys which represents the ray bundles 
     def get_rays_dict(self):
-        rays_dict={}
-        for i in range(len(self.ray_order)):
-            value=self.get_rayval(self.ray_order[i])
-            name=self.ray_order[i]
-            if isinstance(value,int):
-                rays_dict[name]=[value]
-            elif name=="raster":
-                if(value=="RectGrid"):
-                    rays_dict[name]=raster.RectGrid()
-            else:    
-                rays_dict[self.ray_order[i]]=self.convert_2_list(value)
-        return rays_dict 
+        rays_list=[]
+        dummy_dict={}
+        if(type(self.rays)==list):
+            for line in range(len(self.rays)):
+                for i in range(len(self.ray_order)):
+                    value=self.get_rayval(self.ray_order[i], line)
+                    name=self.ray_order[i]
+                    if not isinstance(value,str):
+                        dummy_dict[name]=value
+                    elif name=="raster":
+                        if(value=="RectGrid"):
+                            dummy_dict[name]=raster.RectGrid()
+                rays_list.append(dummy_dict)
+        else:
+            for i in range(len(self.ray_order)):
+                value=self.get_rayval_tupel(self.ray_order[i])
+                name=self.ray_order[i]
+                if not isinstance(value,str):
+                    dummy_dict[name]=value
+                elif name=="raster":
+                    if(value=="RectGrid"):
+                        dummy_dict[name]=raster.RectGrid()
+            rays_list.append(dummy_dict)
+
+        return rays_list 
 
 def str_to_class(classname):
     return getattr(sys.modules[__name__], classname)

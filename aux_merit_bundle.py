@@ -37,25 +37,15 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
 from auxiliary_functions import error2squared, error1
 
 
-def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10, 
-                       wavelength=[0.587e-3]):
+def buildInitialbundle(osa, s, sysseq, rays_list, numrays, wavelength):
     '''
     Initialises the Initialbundles
     '''    
-    #Set defaults for dictionary
-    rays_dict.setdefault("startx", [0])
-    rays_dict.setdefault("starty", [0])
-    rays_dict.setdefault("startz", [-7])
-    rays_dict.setdefault("angley", [0])
-    rays_dict.setdefault("anglex", [0])
-    rays_dict.setdefault("rasterobj", raster.RectGrid())
-    rays_dict.setdefault("radius", [15])
-    
+
     # We want to build a Matrix with the initialbundles as entrys
     # get size of Matrix
     p = len(wavelength)
-    q = len(rays_dict["startx"])*len(rays_dict["starty"])*len(rays_dict["startz"])*\
-    len(rays_dict["angley"])*len(rays_dict["anglex"])*len(rays_dict["radius"])
+    q=len(rays_list)
     # initialize Matrix
     initialbundle = [[0 for x in range(p)] for y in range(q)]
     r2 = []
@@ -63,24 +53,25 @@ def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10,
     #Iterate over all entries
     counteri = 0
     counterj = 0
-    for i in rays_dict["startx"] :
-        for j in rays_dict["starty"] :
-            for k in rays_dict["startz"] :
-                for l in rays_dict["angley"] :
-                    for m in rays_dict["anglex"] :
-                        for n in rays_dict["radius"] :
-                            counterj = 0
-                            #Setup dict for current Bundle
-                            bundle_dict = {"startx":i, "starty":j, "startz":k,
-                                           "angley":l, "anglex":m, "radius":n,
-                                           "rasterobj":rays_dict["rasterobj"]}
-                            for o in wavelength :
-                                (o1, k1, E1) = osa.collimated_bundle(numrays,
-                                                            bundle_dict, wave=o)
-                                initialbundle[counteri][counterj] = \
-                                     RayBundle(x0=o1, k0=k1, Efield0=E1, wave=o)
-                                counterj = counterj + 1
-                            counteri = counteri + 1
+    for bundle in range(q):
+        i=rays_list[bundle]["startx"] 
+        j=rays_list[bundle]["starty"] 
+        k=rays_list[bundle]["startz"] 
+        l=rays_list[bundle]["angley"] 
+        m=rays_list[bundle]["anglex"] 
+        n=rays_list[bundle]["radius"] 
+        counterj = 0
+        #Setup dict for current Bundle
+        bundle_dict = {"startx":i, "starty":j, "startz":k,
+                       "angley":l, "anglex":m, "radius":n,
+                       "rasterobj":rays_list[bundle]["raster"]}
+        for o in wavelength :
+            (o1, k1, E1) = osa.collimated_bundle(numrays,
+                                        bundle_dict, wave=o)
+            initialbundle[counteri][counterj] = \
+                 RayBundle(x0=o1, k0=k1, Efield0=E1, wave=o)
+            counterj = counterj + 1
+        counteri = counteri + 1
     return initialbundle
 
 def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
