@@ -2,8 +2,6 @@
 # including the necessary classes, functions and libraries
 # by patrick, leandro, michael, lewin
 
-################## test fuer patrick
-
 # lewin has created this file for testing some algorithms and to not change the 
 # original file (01_..), which is the main file for patricks changes (outsourcing
 # some functions and so on). i will use this file only for testing until the 
@@ -82,8 +80,6 @@ from aux_merit_bundle import buildInitialbundle, get_bundle_merit
 from derivatives import get_stochastic_grad
 
 
-
-
 #####################################NeuAnfang##################################
 #create inout object for all io stuff
 fi1=inout()
@@ -120,14 +116,15 @@ osa = OpticalSystemAnalysis(s, sysseq)
 
 
 # III ----------- defining raybundles for optimization and plotting 
-# rays_dict = fi1.get_rays_dict()
+#rays_dict = fi1.get_rays_dict()
 
-rays_dict = {"startz":[-8], "starty": [0], "radius": [8],
-             "anglex": [0.05, 0.025, 0., -0.025, -0.05], 
+rays_dict = {"startz":[0], "starty": [0], "radius": [16],
+             "anglex": [0., 0.1832595], 
              "rasterobj":raster.RectGrid()}
+
 wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
-numrays = 50
-sample_param = 'bundle'
+numrays = 20
+sample_param = 'wave'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                                      numrays, wavelength, 
@@ -139,7 +136,7 @@ sample_param = 'bundle'
 
 # ----- plot the original system
 # --- set the plot setting
-'''
+
 pn = np.array([1, 0, 0])
 up = np.array([0, 1, 0])
 
@@ -148,12 +145,12 @@ ax1 = fig.add_subplot(211)
 ax2 = fig.add_subplot(212)
 ax1.axis('equal')
 ax2.axis('equal')
-'''
+
 # --- plot the bundles and draw the original system
 # first it is necessary to copy the initialbundle, as it's gonna be changed
 # inside of the seqtrace function (called inside of plotBundles)
-#testbundle = deepcopy(initialbundle)
-#plotBundles(s, initialbundle, sysseq, ax1, pn, up)
+testbundle = deepcopy(initialbundle)
+plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 # IV ----------- optimization
 # ----- define optimizable variables
@@ -205,16 +202,16 @@ plotsettings = {'fig'      : 1,
 # TODO: generalize the methods to plot more than one curve
 options_s1 = {'gtol'    : 1e+8,
               'maxiter' : 100, 
-              'stepsize': 1e-2, 
+              'stepsize': 1e-10, 
               'beta1'   : 0.1, 
               'beta2'   : 0.99,
-              'gradtol' : 550,
+              'gradtol' : 500,
               'roh'     : 0.999,
-              'epsilon' : 1e-3,
+              'epsilon' : 1e-8,
               'gamma'   : 0.9,
-              'methods' : 'momentum',
+              'methods' : 'gradient',
               'pathf'   : True,
-              'plot'    : True,
+              'plot'    : False,
               'plotset' : plotsettings}
 
 # options for deterministic optimization method
@@ -233,7 +230,7 @@ options_d = {'maxiter': 150,
 #         'options_s': options_s}
 
 # ---- stochastic gradient descent
-opt_backend_1 = ProjectScipyBackend(optimize_func=adagrad,
+opt_backend_1 = ProjectScipyBackend(optimize_func=adadelta,
                                     methodparam='penalty-lagrange',
                                     stochagradparam=True,
                                     options=options_s1)
@@ -255,18 +252,7 @@ opt_backend_1.stochagrad = stochagrad_1
 
 s1 = optimi_1.run()
 
-plt.show()
-'''
 #*******************************************************************************
-
-
-
-# print the final simplex, which are the meritfunction values
-# print("f simplex: ", opt_backend.res.final_simplex[1])
-# print("iterNum = ", opt_backend.res.nit)
-#
-#
-#
 ## V----------- plot the optimized system
 #
 ## --- plot the bundles and draw the system
@@ -283,19 +269,3 @@ plt.show()
 fi1.store_data(s)
 fi1.write_to_file()
 
-#*******************************************************************************
-
-## V----------- plot the optimized system
-#
-## --- plot the bundles and draw the system
-plotBundles(s, testbundle, sysseq, ax2, pn, up)
-##
-# --- draw spot diagrams
-# plotSpotDia(osa, numrays, rays_dict, wavelength)
-
-
-# get a look at the vars
-ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
-
-plt.show()
-'''

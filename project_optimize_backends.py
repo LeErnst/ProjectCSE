@@ -99,7 +99,6 @@ class ProjectScipyBackend(Backend):
 
             print('----------------- run penalty -----------------')
 
-            #xk_1 = x0
             xk   = x0
             while (1): 
                 # define the gradient for the penalty method
@@ -151,28 +150,25 @@ class ProjectScipyBackend(Backend):
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
                 if (iterNum>=5):
                     print('\n----------- end of penalty run -----------')
-                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
+                    print('\nReached max. numbers of penalty iterations = %d' % \
+                          (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
-                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
+                elif ((numpy.linalg.norm(grad_total(xk))<self.gtol) and 
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('\n----------- end of penalty run -----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif (numpy.linalg.norm(grad_total(xk)<self.gtol) and
+                elif ((numpy.linalg.norm(grad_total(xk))>self.gtol) and
                     (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
-                    print('Algorithm did not reach a Minimum!')
-                    print('Keep Lambda and Tau and continue with Algorithm')
+                    print('Keep Tau and continue with Algorithm')
                 else: # xk is not in the feasible set -> update tauk
                     # update tau
                     self.tauk = 7*self.tauk 
-
-                # update xk-1 
-                #xk_1 = xk
 
         elif (self.methodparam == 'penalty-lagrange'):
 
@@ -205,7 +201,7 @@ class ProjectScipyBackend(Backend):
                         return res
 
                 # store the grad-function in options
-                self.options['grad']= grad_total
+                self.options['grad'] = grad_total
             
                 # update iteration number
                 iterNum += 1
@@ -242,18 +238,19 @@ class ProjectScipyBackend(Backend):
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
                 if (iterNum>=5):
                     print('\n----------- end of penalty lagrange run -----------')
-                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
+                    print('\nReached max. numbers of penalty iterations = %d' % \
+                          (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
-                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
+                elif ((numpy.linalg.norm(grad_total(xk))<self.gtol) and
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('\n---------- end of penalty lagrange run ----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif (numpy.linalg.norm(grad_total(xk)<self.gtol) and 
+                elif ((numpy.linalg.norm(grad_total(xk))>self.gtol) and 
                     (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
                     print('Keep Lambda and Tau and continue with Algorithm')
@@ -297,7 +294,7 @@ class ProjectScipyBackend(Backend):
                 # store the grad-function in options
                 self.options['grad']= grad_total
 
-               # update iteration number
+                # update iteration number
                 iterNum += 1
                 print('\niteration number = %d' % (iterNum))
 
@@ -327,14 +324,14 @@ class ProjectScipyBackend(Backend):
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
-                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
+                elif ((numpy.linalg.norm(grad_total(xk))<self.gtol) and
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('\n---------- end of log run ----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif (numpy.linalg.norm(grad_total(xk)<self.gtol) and 
+                elif ((numpy.linalg.norm(grad_total(xk))>self.gtol) and 
                     (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
                     print('Keep my and continue with Algorithm')
@@ -434,6 +431,7 @@ def sgd(func, x0, args,
         # debugging
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+#        printArray('gk =', gk)
 
         # update path
         path[iternum] = fk
@@ -718,7 +716,7 @@ def adagrad(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-#        printArray('stepsize*(gk/(sqrt(G)+epsilon)) =', stepsize*(gk/(numpy.sqrt(G)+epsilon)))
+#        printArray('gk =', gk)
 
         # update path
         path[iternum] = fk

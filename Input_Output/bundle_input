@@ -4,4 +4,4 @@
 #Possible values for the raster object: At the moment only RectGrid is implemented 
 #Write down just one line. More lines are not necessary and not supported. You can specify more bunderls within a line
 #startx         starty      startz               radius      anglex          angley          numrays         wavelength         raster  
-0               0           0                    16          0.0&0.1832595   0               1              0.58749e-3         RectGrid
+0               0           0                    16          0.0&0.1832595   0               10              0.58749e-3         RectGrid
