@@ -1,7 +1,8 @@
 #This file is for specifying the bundles of the raytracer
 #This values are automatically converted to a rays_dict
-#If there should be more than two start values write 5&4&7 <- e.g. three start values
 #Possible values for the raster object: At the moment only RectGrid is implemented 
-#Write down just one line. More lines are not necessary and not supported. You can specify more bunderls within a line
-#startx         starty      startz               radius      anglex          angley          numrays         wavelength         raster  
-0               0           0                    16          0.0&0.1832595   0               1              0.58749e-3         RectGrid
+#Number of rays and the wavelenth are due to some technical issues located at the file bundle_spec
+
+#startx         starty      startz               radius      anglex          angley                   raster  
+0               0           0                    16          0.0             0                        RectGrid
+0               0           0                    16          0.1832595       0                        RectGrid
