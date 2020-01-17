@@ -86,6 +86,16 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
     initialbundle = buildInitialbundle(osa, s, sysseq, rays_dict, 
                                        numrays, wavelength)
+    # determine the number of bundles
+    numbundles = len(initialbundle)
+    # determine the true number of rays of a bundle
+    # in general numrays_true != numrays holds
+    numrays_true = initialbundle[0][0].x.shape[2]
+    # determine the number of different wavelengths, here the assumption is made
+    # that all bundles are created for the same number of different wavelength
+    numwaves   = len(initialbundle[0])
+    # calculate the number of rays for a bundle for all different wavelengths
+    numrays_waves = numwaves*numrays_true
 
     # --- define meritfunctions:
     # You can add your meritfunctionsrms-implementation and then add it to 
@@ -102,11 +112,12 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
         res = 0
 
         # Loop over all bundles
-        for i in range(0, len(initialbundle)):
+        for i in range(0, numbundles):
             x = np.array([])
             y = np.array([])
+
             # Loop over wavelenghts
-            for j in range(0, len(initialbundle[0])):
+            for j in range(0, numwaves):
                 my_initialbundle = copy.copy(initialbundle[i][j])
                 rpaths = my_s.seqtrace(my_initialbundle, sysseq)
 
@@ -119,18 +130,20 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
             xmean = np.mean(x)
             ymean = np.mean(y)
 
+            # this could be simplified, for the sake of clarity we do not
+            if (penalty == True):
+                res += (math.exp(numrays_true/(len(x)+1e-1))-\
+                        math.exp(numrays_true/(numrays_true+1e-1)))
+
             # Choose error function
             if (error == 'error2'):
-                res += error2squared(x, xmean, y, ymean, penalty=penalty)
+                res += error2squared(x, xmean, y, ymean)
             elif (error == 'error1'):
-                res += error1(x, xmean, y, ymean, penalty=penalty)
+                res += error1(x, xmean, y, ymean)
 
         return res
 
     # ---------------sgd meritfunction
-    wavel   = len(initialbundle[0])
-    numrays = initialbundle[0][0].x.shape[2]
-
     def meritfunctionrms_sgd(my_s, **kwargs):
         if (len(kwargs) == 0):
             return meritfunctionrms_standard(my_s)
@@ -146,8 +159,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
             if (sample_param == 'bundle'):
                 sample_initialbundle = initialbundle[sample_num]
             if (sample_param == 'wave'):
-                sample_initialbundle = [initialbundle[sample_num//wavel]\
-                                                     [sample_num%wavel]]
+                sample_initialbundle = [initialbundle[sample_num//numwaves]\
+                                                     [sample_num%numwaves]]
             if (sample_param == 'ray'):
                 # TODO:
                 # this option can cause an error, because the number of rays 
@@ -156,12 +169,14 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 # hit the image plane. Because of that a random number can be 
                 # drawn but there is no associated ray. the mask, which has then
                 # the wrong size will cause an error.
-                bundlenum = sample_num//(wavel*numrays)
-                wavenum   = (sample_num-wavel*numrays*bundlenum)//numrays
-                raynum    = sample_num-wavel*numrays*bundlenum-numrays*wavenum
+                bundlenum = sample_num//(numwaves*numrays_true)
+                wavenum   = (sample_num-numwaves*numrays_true*bundlenum)//\
+                            numrays_true
+                raynum    = sample_num-numwaves*numrays_true*bundlenum-\
+                            numrays_true*wavenum
 
                 sample_initialbundle = [initialbundle[bundlenum][wavenum]]
-                mask = np.zeros(numrays, dtype=bool)
+                mask = np.zeros(numrays_true, dtype=bool)
                 mask[raynum] = True
 
             # Loop over sample_initialbundle
@@ -186,11 +201,16 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                     x = x[mask]
                     y = y[mask]
 
+                # this could be simplified, for the sake of clarity we do not
+                if (penalty == True):
+                    res += (math.exp(numrays_true/(len(x)+1e-1))-\
+                            math.exp(numrays_true/(numrays_true+1e-1)))
+
                 # Choose error function
                 if (error == 'error2'):
-                    res += error2squared(x, xmean, y, ymean, penalty=penalty)
+                    res += error2squared(x, xmean, y, ymean)
                 elif (error == 'error1'):
-                    res += error1(x, xmean, y, ymean, penalty=penalty)
+                    res += error1(x, xmean, y, ymean)
 
             return res
 

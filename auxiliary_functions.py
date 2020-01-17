@@ -365,17 +365,11 @@ def str_to_class(classname):
     return getattr(sys.modules[__name__], classname)
 
 
-def error2squared(x, x_ref, y, y_ref, penalty=False):
+def error2squared(x, x_ref, y, y_ref):
     '''
     computes the squared
     '''
-    if (penalty):
-        if (penalty==True):
-            penalty=50.
-        res = np.sum((x - x_ref)**2 + (y - y_ref)**2)\
-              + penalty*math.exp(-len(x))
-    else:
-        res = np.sum((x - x_ref)**2 + (y - y_ref)**2) 
+    res = np.sum((x - x_ref)**2 + (y - y_ref)**2) 
 
     return res
 
@@ -385,13 +379,7 @@ def error1(x, x_ref, y, y_ref, penalty=False):
     computes the 
     L1-error = sum_{i=1 to #rays}(||(x_i, y_i)^T - (x_ref, y_ref)^T||_1)
     '''
-    if penalty:
-        if (penalty==True):
-            penalty=50.
-        res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))\
-              + penalty*math.exp(-len(x))
-    else:
-        res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))
+    res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))
 
     return res
 

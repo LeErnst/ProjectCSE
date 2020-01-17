@@ -116,11 +116,11 @@ osa = OpticalSystemAnalysis(s, sysseq)
 
 
 # III ----------- defining raybundles for optimization and plotting 
-#rays_dict = fi1.get_rays_dict()
+rays_dict = fi1.get_rays_dict()
 
-rays_dict = {"startz":[0], "starty": [0], "radius": [16],
-             "anglex": [0., 0.1832595], 
-             "rasterobj":raster.RectGrid()}
+#rays_dict = {"startz":[0], "starty": [0], "radius": [16],
+#             "anglex": [0., 0.1832595], 
+#             "rasterobj":raster.RectGrid()}
 
 wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
 numrays = 20
@@ -202,14 +202,14 @@ plotsettings = {'fig'      : 1,
 # TODO: generalize the methods to plot more than one curve
 options_s1 = {'gtol'    : 1e+8,
               'maxiter' : 100, 
-              'stepsize': 1e-10, 
+              'stepsize': 1e-7, 
               'beta1'   : 0.1, 
               'beta2'   : 0.99,
               'gradtol' : 500,
               'roh'     : 0.999,
               'epsilon' : 1e-8,
-              'gamma'   : 0.9,
-              'methods' : 'gradient',
+              'gamma'   : 0.1,
+              'methods' : 'nag',
               'pathf'   : True,
               'plot'    : False,
               'plotset' : plotsettings}
@@ -230,7 +230,7 @@ options_d = {'maxiter': 150,
 #         'options_s': options_s}
 
 # ---- stochastic gradient descent
-opt_backend_1 = ProjectScipyBackend(optimize_func=adadelta,
+opt_backend_1 = ProjectScipyBackend(optimize_func=sgd,
                                     methodparam='penalty-lagrange',
                                     stochagradparam=True,
                                     options=options_s1)
