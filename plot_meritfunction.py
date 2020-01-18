@@ -83,11 +83,11 @@ from derivatives import get_stochastic_grad
 var_list = [[False, 0, 'image plane decz', None],
             [False, 3, 'surf plane decz', None],
             [False, 7, 'surf plane decz', None],
-            [False, 9, 'surf8 curvature', np.array([-0.2, 0.2])],
+            [False, 9, 'surf8 curvature', np.array([0.03, 0.05])],
             [False, 13, 'surf curvature', np.array([-0.2, 0.2])],
             [False, 16, 'surf curvature', np.array([-0.2, 0.2])]]
 
-for (logy, plotvar, legend, interval) in var_list:
+for (logy, plotvar, legend, interval) in [var_list[3]]:
     #####################################NeuAnfang##################################
     #create inout object for all io stuff
     fi1=inout()
@@ -130,12 +130,12 @@ for (logy, plotvar, legend, interval) in var_list:
     #             "anglex": [0., 0.1832595], 
     #             "rasterobj":raster.RectGrid()}
     
-    wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
-    numrays = 20
+    #wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
+    #numrays = 50
     sample_param = 'wave'
     
     (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
-                                                         numrays, wavelength, 
+                                                         fi1.numrays, fi1.wavelengths, 
                                                          whichmeritfunc='sgd', 
                                                          error='error2',
                                                          sample_param=sample_param,
@@ -144,7 +144,7 @@ for (logy, plotvar, legend, interval) in var_list:
     
     # ----- plot the original system
     # --- set the plot setting
-    '''
+
     pn = np.array([1, 0, 0])
     up = np.array([0, 1, 0])
     
@@ -153,12 +153,12 @@ for (logy, plotvar, legend, interval) in var_list:
     ax2 = fig.add_subplot(212)
     ax1.axis('equal')
     ax2.axis('equal')
-    '''
+
     # --- plot the bundles and draw the original system
     # first it is necessary to copy the initialbundle, as it's gonna be changed
     # inside of the seqtrace function (called inside of plotBundles)
-#    testbundle = deepcopy(initialbundle)
-#    plotBundles(s, initialbundle, sysseq, ax1, pn, up)
+    testbundle = deepcopy(initialbundle)
+    plotBundles(s, initialbundle, sysseq, ax1, pn, up)
     
     
     # IV ----------- optimization
@@ -194,7 +194,7 @@ for (logy, plotvar, legend, interval) in var_list:
     
     # options for meritfunctionplot
     options_s1 = {'gtol'    : 1e+10,
-                  'disk'    : 300,
+                  'disk'    : 5000,
                   'plotvar' : plotvar,
                   'interval': interval,
                   'plotset' : plotsettings}
@@ -223,19 +223,19 @@ for (logy, plotvar, legend, interval) in var_list:
     s1 = optimi_1.run()
     
 
-plt.show()
-'''
-#*******************************************************************************
-## V----------- plot the optimized system
-#
-## --- plot the bundles and draw the system
-plotBundles(s, testbundle, sysseq, ax2, pn, up)
-##
+    #plt.show()
 
-# get a look at the vars
-ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
+    #*******************************************************************************
+    ## V----------- plot the optimized system
+    #
+    ## --- plot the bundles and draw the system
+    plotBundles(s, testbundle, sysseq, ax2, pn, up)
+    ##
+    
+    # get a look at the vars
+    ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
+    
+    plt.show()
+    fi1.store_data(s)
+    fi1.write_to_file()
 
-plt.show()
-fi1.store_data(s)
-fi1.write_to_file()
-'''

@@ -2,5 +2,5 @@
 #If you want define more wavelengths, use the & symbol e.g. 0.1&0.2&0.3
 
 #numrays    wavelengths
-10          0.58749e-3&0.6562725e-3
+20          0.5875618e-3&0.4861327e-3&0.6562725e-3
 
