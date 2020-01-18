@@ -336,9 +336,9 @@ class inout:
     #returns a list with all bundle dictionarys which represents the ray bundles 
     def get_rays_dict(self):
         rays_list=[]
-        dummy_dict={}
         if(type(self.rays)==list):
             for line in range(len(self.rays)):
+                dummy_dict={}
                 for i in range(len(self.ray_order)):
                     value=self.get_rayval(self.ray_order[i], line)
                     name=self.ray_order[i]
