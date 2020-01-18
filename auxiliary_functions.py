@@ -663,13 +663,18 @@ def plot2d(xarray, yarray,
            grid=True,
            linewidth=2,
            linestyle='-o',
+           markersize=2,
            save=False,
            name='plot2d.png',
            show=False,
            *args):
 
     plt.figure(fig)
-    plt.plot(xarray, yarray, linestyle, lw=linewidth, label=legend)
+    plt.plot(xarray, yarray, 
+             linestyle, 
+             lw=linewidth, 
+             markersize=markersize, 
+             label=legend)
     # axis
     plt.xlabel(xlabel, fontsize=fontaxis)
     plt.ylabel(ylabel, fontsize=fontaxis)

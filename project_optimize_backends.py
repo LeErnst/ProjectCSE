@@ -932,7 +932,43 @@ def gradient_descent(func, x0, args=(),
             break
 
     printArray('gradient in gradient decsent for x_final = ', grad(xk))
+
     return OptimizeResult(fun=func(xk), x=xk, nit=iternum)
+
+
+def plot_meritfunction(func, x0, args=(), 
+                       disk=100,
+                       plotvar=0,
+                       interval=None,
+                       plotset={},
+                       **kwargs):
+
+    mf = numpy.empty(disk)
+    dim = len(x0)
+    x = x0
+    if (plotvar >= dim or 0 > plotvar):
+        raise ValueError('plotvar is out of range [0,len(x0)-1]')
+
+    lb = kwargs['bounds'].lb[plotvar]
+    ub = kwargs['bounds'].ub[plotvar]
+    if type(interval) is not numpy.ndarray:
+        if (interval == None):
+            interval = numpy.linspace(lb, ub, disk)
+        else:
+            raise ValueError('Something is wrong with interval')
+    else:
+        interval = numpy.linspace(interval[0], interval[1], disk)
+
+    for i in range(disk):
+        x[plotvar] = interval[i]
+        mf[i] = func(x)
+    
+    plot2d(interval, mf, **plotset)
+
+    x[plotvar] = interval[-1]
+
+    return OptimizeResult(fun=func(x), x=x, nit=disk)
+
 
 
 def test_minimize_neldermead(func, x0, args=(), 

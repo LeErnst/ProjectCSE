@@ -54,7 +54,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        adamax,
                                        adagrad,
                                        adadelta,
-                                       get_scipy_stochastic_hybrid)
+                                       get_scipy_stochastic_hybrid,
+                                       plot_meritfunction)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -186,14 +187,14 @@ def osupdate(my_s):
 #                                            scipy_opt_func ='Newton-CG') 
 
 plotsettings = {'fig'      : 1,
-                'title'    : 'gradient descent algorithm',
-                'xlabel'   : 'iteration number',
+                'title'    : r'p_{i}-meritfunction-plot',
+                'xlabel'   : r'p_{i}',
                 'ylabel'   : 'meritfunctionvalue',
-                'legend'   : 'stepsize = 1e-9',
-                'ylog'     : True,
+                'legend'   : '',
+                'ylog'     : False,
                 'linestyle': '-o', 
                 'save'     : False,
-                'name'     : 'dgMF.png',
+                'name'     : '',
                 'show'     : False}
 
 # options for stochastic optimization method
