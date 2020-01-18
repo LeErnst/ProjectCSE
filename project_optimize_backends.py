@@ -1329,7 +1329,7 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     tolError = 1e-3
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
-    Np = n*m*20          # population size
+    Np = 50          # population size
     xbest = x0
     fbest = func(xbest)
     bounds = unknown_options['bounds']
@@ -1366,11 +1366,9 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
                 b = bounds.ub[i]
                 R[i].append(random.random()*(b-a)+a)     # wo dazu ordnen?
                 ctr += 1
-        
         # random shuffle of all lines in R
         for i in range(n):
             random.shuffle(R[i])
-
         # determine function values of individuals:
         F = numpy.empty(Np)
         for w in range(Np):
@@ -1395,6 +1393,9 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
                                 xbest[i]<=bounds.lb[i]+(j+1)*delta[i]):
                     r[i] = j
                     break
+        
+        print("P alt = ", P)
+        print("r = ", r)
 
         # Updating der Probability Matrix:
         P_s = numpy.empty([n,m])
@@ -1402,7 +1403,6 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
             for j in range(m):
                 L = 0.5*math.exp(-(j-r[i])**2)      # Learning rate
                 P_s[i,j] = (1-L)*P[i,j]+L
-
         # Normalizing each row of P_s -> new P
         for i in range(n):
             summe = 0
@@ -1411,13 +1411,246 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
             for j in range(m):
                 P[i,j] = (1/summe) * P_s[i,j]
 
+        print("P neu = ",P)
         it += 1
                 
 
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
 
 
+def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=3,**unknown_options):
+    # algorithm based on population based incremental learning
+    # Np = population size; Ng = number of generations; 
+    # m = subintervalls between lower bound and upper bound
+    #---------------------------------------------------------------------------
+    def approx_grad(swarm,func,bounds):
+        # in swarm are the best and the next Q best particles (its a list with particle objects)
 
+        A = numpy.empty([Q,n])
+        b = numpy.empty(Q)
+        xbest = swarm[0].pos
+        fbest = swarm[0].f
+
+
+        for i in range(Q):
+            for j in range(n):
+                xi = swarm[i+1].pos
+                A[i,j] = xbest[j] - xi[j]
+            fi = swarm[i+1].f
+            b[i] = fbest - fi
+
+        grad = numpy.linalg.pinv(A).dot(b)
+        s = -grad
+
+        NewPart = []        # list for new particle objects
+
+        check = 0
+        beta1 = random.uniform(1e-9,1e-6)
+        Pos = xbest + beta1*s
+        if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
+            NewPart.append(particle(Pos))
+        else:
+            check = 1
+        beta2 = random.uniform(1e-9,1e-6)
+        Pos = xbest + beta2*s
+        if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
+            NewPart.append(particle(Pos))
+        else:
+            check = 1
+
+        if (check > 0):             # if one of the first two points isn't in feasible region -> stop
+            print("nicht in feasible region")
+            return NewPart
+        else:
+            # solve LGS T*u=w
+            f1 = NewPart[0].f
+            f2 = NewPart[1].f
+            T = numpy.array([[0,0,1],[beta1**2,beta1,1],[beta2**2,beta2,1]])
+            w = numpy.array([fbest,f1,f2])
+            u = numpy.linalg.solve(T, w)
+            
+            # determine z3:
+            beta3 = -u[1]/2/u[0]
+            Pos = xbest + beta3*s
+            NewPart.append(particle(Pos))
+    
+            return NewPart
+
+    def EDR(X,t,Ng):          # Evolutionary Direction Recombination
+        # X: list with three random particles
+        # t: number of the actual generation (t start from 1)
+        # Ng: number of generations (maximum)
+        #-----------------------------------------------------------------------
+        def SL(t):
+            # computes the maximal Step Length
+            return math.exp((6.2146/(Ng-1))-0.6931)*math.exp(-(6.2146/(Ng-1))*t)
+            
+        #-----------------------------------------------------------------------
+        n = len(X[0].pos)
+        
+        # sort particles from f_low to f_high:
+        X.sort(key=lambda x: x.f)
+
+        # compute evolutionary direction:
+        a = numpy.random.normal(loc=0.0, scale=1.0, size=n)
+        c = 0.05*a
+        s = (X[0].pos-X[1].pos)+(X[0].pos-X[2].pos)+c
+        
+        # calculate new positions:
+        NewPart = []
+        Pos = X[0].pos + numpy.random.uniform()*SL(t)*s
+        if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
+            NewPart.append(particle(Pos))
+        Pos = X[0].pos - numpy.random.uniform()*SL(t)*s
+        if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
+            NewPart.append(particle(Pos))
+
+        return NewPart
+
+    class particle:
+        def __init__(self,x0):
+            self.pos = x0
+            self.f = func(x0)
+
+
+    #---------------------------------------------------------------------------
+    tolError = 1e-3
+    stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
+    n = len(x0)         # problem size
+    Np = 50          # population size
+    #xbest = x0
+    #fbest = func(xbest)
+    xbest = numpy.empty(n)
+    fbest = 1e16
+    bounds = unknown_options['bounds']
+
+    # vector delta is needed to define the subintervalls
+    delta = numpy.empty(n)
+    for i in range(n):
+        delta[i] = (bounds.ub[i]-bounds.lb[i])/float(m)
+
+    # initializing probability matrix
+    P = numpy.empty([n,m])
+    for i in range(n):
+        for j in range(m):
+            P[i,j] = 1/float(m)
+
+    stopTol = 0
+    it = 0
+    
+    #while it<Ng and stopTol<stopNum:  
+    while it<Ng:
+        # Update subpopulation with (Np/2) individuals:
+        R = [[] for i in range(n)]          # initialization of population list R
+        for i in range(n):                  # loop over all components of x
+            ctr = 0
+            for j in range(m):              # loop over all subintervalls
+                for t in range(int(math.floor(int(Np/2)*P[i,j]))):
+                    #rand*(b-a)+a to create a random number betwenn [a,b]
+                    a = bounds.lb[i]+j*delta[i]
+                    b = bounds.lb[i]+(j+1)*delta[i]
+                    R[i].append(random.random()*(b-a)+a)
+                    ctr += 1
+            while ctr<int(Np/2):
+                a = bounds.lb[i]
+                b = bounds.ub[i]
+                R[i].append(random.random()*(b-a)+a)     # wo dazu ordnen?
+                ctr += 1
+        
+        # random shuffle of all lines in R
+        for i in range(n):
+            random.shuffle(R[i])
+        
+        # create particle objects:
+        swarm = []
+        for w in range(int(Np/2)):
+            Ind = numpy.empty(n)
+            for i in range(n):
+                Ind[i] = R[i][w]
+            swarm.append(particle(Ind))
+
+        # sort swarm in order of function values (low to high):
+        swarm.sort(key=lambda x: x.f)
+
+        # update xbest:
+        if (swarm[0].f <= fbest):
+            fbest = swarm[0].f
+            xbest = swarm[0].pos
+
+        # Approsimate Gradient Method:
+        NewPart = approx_grad(swarm[0:Q+1],func,bounds)
+
+        # Add new particles to swarm:
+        swarm.extend(NewPart)
+
+        # sort swarm again (from f_low to f_high):
+        swarm.sort(key=lambda x: x.f)
+
+        # Update xbest:
+        if (swarm[0].f <= fbest):
+            fbest = swarm[0].f
+            xbest = swarm[0].pos
+            print("Verbesserung durch AGM")
+
+        # Evolutionary Direction Opterator:
+        while (len(swarm) <= Np-2):
+            a = 0
+            b = 0
+            c = 0
+            while (a==b or a==c or b==c):
+                a = random.randint(0,len(swarm)-1)
+                b = random.randint(0,len(swarm)-1)
+                c = random.randint(0,len(swarm)-1)
+            X = []
+            X.append(swarm[a])
+            X.append(swarm[b])
+            X.append(swarm[c])
+            t = it+1
+            NewPart = EDR(X,t,Ng)       # create 2 children particles
+            swarm.extend(NewPart)       # add 2 children to swarm
+
+        # sort swarm again (from f_low to f_high):
+        swarm.sort(key=lambda x: x.f)
+
+        # Update xbest:
+        if (swarm[0].f <= fbest):
+            fbest = swarm[0].f
+            xbest = swarm[0].pos
+            print("Verbesserung durch EDO")
+
+        print("fbest = ", fbest)
+        
+        # find out in which interval xbest is:
+        r = numpy.empty(n)          # safes the interval number j of xbest[i]
+        for i in range(n):
+            for j in range(m):
+                if(xbest[i]>=bounds.lb[i]+j*delta[i] and \
+                                xbest[i]<=bounds.lb[i]+(j+1)*delta[i]):
+                    r[i] = j
+                    break
+        
+        #print("P alt = ", P)
+        #print("r = ", r)
+
+        # Updating der Probability Matrix:
+        P_s = numpy.empty([n,m])
+        for i in range(n):
+            for j in range(m):
+                L = 0.5*math.exp(-(j-r[i])**2)      # Learning rate
+                P_s[i,j] = (1-L)*P[i,j]+L
+        # Normalizing each row of P_s -> new P
+        for i in range(n):
+            summe = 0
+            for j in range(m):
+                summe += P_s[i,j]
+            for j in range(m):
+                P[i,j] = (1/summe) * P_s[i,j]
+
+        #print("P neu = ",P)
+        it += 1
+                
+
+    return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
     """
         # loop over all particles:
         for i in range(N):
