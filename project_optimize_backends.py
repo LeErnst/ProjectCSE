@@ -5,6 +5,8 @@ import numpy
 import scipy
 import sys
 import time
+import matplotlib.pyplot as plt
+import matplotlib
 from scipy.optimize import minimize
 from scipy.optimize import OptimizeResult
 from pyrateoptics.core.log import BaseLogger
@@ -97,7 +99,6 @@ class ProjectScipyBackend(Backend):
 
             print('----------------- run penalty -----------------')
 
-            #xk_1 = x0
             xk   = x0
             while (1): 
                 # define the gradient for the penalty method
@@ -119,9 +120,6 @@ class ProjectScipyBackend(Backend):
                 # store the grad-function in options
                 self.options['grad'] = grad_total
                 
-                # for benchmark
-                #self.kwargs['jac'] = grad_total
- 
                 # update iteration number
                 iterNum += 1
                 print('\niteration number = %d' % (iterNum))
@@ -150,27 +148,27 @@ class ProjectScipyBackend(Backend):
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
-                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
+                if (iterNum>=5):
+                    print('\n----------- end of penalty run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % \
+                          (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif ((numpy.linalg.norm(grad_total(xk))<self.gtol) and 
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('\n----------- end of penalty run -----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif (iterNum>=50):
-                    print('\n----------- end of penalty run -----------')
-                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
-                    break
+                elif ((numpy.linalg.norm(grad_total(xk))>self.gtol) and
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
+                    print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
+                    print('Keep Tau and continue with Algorithm')
                 else: # xk is not in the feasible set -> update tauk
                     # update tau
                     self.tauk = 7*self.tauk 
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
-
-                # update xk-1 
-                #xk_1 = xk
 
         elif (self.methodparam == 'penalty-lagrange'):
 
@@ -203,11 +201,8 @@ class ProjectScipyBackend(Backend):
                         return res
 
                 # store the grad-function in options
-                self.options['grad']= grad_total
+                self.options['grad'] = grad_total
             
-                # for benchmark
-                #self.kwargs['jac'] = grad_total
-
                 # update iteration number
                 iterNum += 1
 
@@ -238,29 +233,33 @@ class ProjectScipyBackend(Backend):
 
                 printArray('x_k =', res.x, point=points)
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
+                break
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if ((numpy.linalg.norm(eval_h(xk, self.bdry),numpy.inf)<tol_seq)
-                     and (numpy.linalg.norm(grad_total(xk))<self.gtol)) :
+                if (iterNum>=5):
+                    print('\n----------- end of penalty lagrange run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % \
+                          (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif ((numpy.linalg.norm(grad_total(xk))<self.gtol) and
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
                     print('\n---------- end of penalty lagrange run ----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
-                elif (iterNum>=50):
-                    print('\n----------- end of penalty run -----------')
-                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
-                    break
+                elif ((numpy.linalg.norm(grad_total(xk))>self.gtol) and 
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
+                    print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
+                    print('Keep Lambda and Tau and continue with Algorithm')
                 else: # xk is not in the feasible set -> update tauk and lambdak
                     # update tau
                     self.tauk = 7*self.tauk
                     # update lambda
                     self.lamk = numpy.add(self.lamk, 
                                           self.tauk*eval_h(xk, self.bdry))
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                 # update xk-1
                 xk_1 = xk
 
@@ -295,10 +294,7 @@ class ProjectScipyBackend(Backend):
                 # store the grad-function in options
                 self.options['grad']= grad_total
 
-                # for benchmark
-                self.kwargs['jac'] = grad_total
-
-               # update iteration number
+                # update iteration number
                 iterNum += 1
                 print('\niteration number = %d' % (iterNum))
 
@@ -322,24 +318,33 @@ class ProjectScipyBackend(Backend):
                 print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
 
                 # check if xk is in the feasible set with ||h(x)||_inf < 10*eps
-                if (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf) < tol_seq):
-                    print('\n---------- end of log barrier run----------')
+                if (iterNum>=5):
+                    print('\n----------- end of log run -----------')
+                    print('\nReached max. numbers of penalty iterations = %d' % (iterNum))
+                    print('\n||h(x)||_inf = %5.3f' % \
+                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
+                    break
+                elif ((numpy.linalg.norm(grad_total(xk))<self.gtol) and
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
+                    print('\n---------- end of log run ----------')
                     print('\nTerminated in iteration = %d' % (iterNum))
                     print('\n||h(x)||_inf = %5.3f' % \
                           (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
                     break
+                elif ((numpy.linalg.norm(grad_total(xk))>self.gtol) and 
+                    (numpy.linalg.norm(eval_h(xk,self.bdry),numpy.inf)<tol_seq)):
+                    print('Algorithm did not reach a Minimum but the solution is still in the feasible area!')
+                    print('Keep my and continue with Algorithm')
+                    break
                 else: # xk is not in the feasible set -> update my
                     # update my
                     self.my = self.my/10
-                    print('\n||h(x)||_inf = %5.3f' % \
-                          (numpy.linalg.norm(eval_h(xk, self.bdry), numpy.inf)))
 
                 # update xk-1
                 xk_1 = xk
 
         else:
-            print('Methodparam not found!')
-            sys.exit()
+            raise ValueError('Methodparam is not found!')
 
         printArray('x_k =', res.x, point=points)
         print('\nmeritfunction(x_k) = %10.6f' % (self.func(res.x)))
@@ -354,8 +359,37 @@ def sgd(func, x0, args,
         gamma=0.9,
         gradtol=1500,
         pathf=False,
+        plot=False,
+        plotset={},
         **kwargs):
 
+    '''
+    Stochastic gradient descent with options. 
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    methods  - the method options, possible:
+               vanilla : sgd
+               momentum: sgd with momentum
+               nag     : nesterovs accelerated gradient
+               gradient: gradient decent with real gradient
+    gamma    - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Ruder, Sebastian. "An overview of gradient descent optimization algorithms."
+    arXiv preprint arXiv:1609.04747 (2016).
+    '''
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
     iternum    = 0
@@ -373,15 +407,19 @@ def sgd(func, x0, args,
 
         # choose the method
         if (methods == 'vanilla'):
-            vk = stepsize*stochagrad(xk_1)
+            # vanilla sgd
+            vk   = stepsize*stochagrad(xk_1)
         if (methods == 'momentum'):
             # momentum vector
-            vk = gamma*vk_1+stepsize*stochagrad(xk_1)
+            vk   = gamma*vk_1+stepsize*stochagrad(xk_1)
             vk_1 = vk
         if (methods == 'nag'):
             # nesterov accelerated gradient
-            vk = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
+            vk   = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
             vk_1 = vk
+        if (methods == 'gradient'):
+            # gradient descent
+            vk   = stepsize*gradient(xk_1)
 
         # iteration rule
         xk = xk_1 - vk 
@@ -389,8 +427,12 @@ def sgd(func, x0, args,
         fk = func(xk)
         gk = gradient(xk)
         gknorm = numpy.linalg.norm(gk, numpy.inf)
+
+        # debugging
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+#        printArray('gk =', gk)
+
         # update path
         path[iternum] = fk
         # termination
@@ -399,12 +441,20 @@ def sgd(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
 
     return result
 
@@ -417,7 +467,34 @@ def adam(func, x0, args,
          epsilon=1e-2,
          gradtol=1500,
          pathf=False,
+         plot=False,
+         plotset={},
          **kwargs):
+
+    '''
+    Adaptive moment estimation - based on sgd
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    beta1    - parameter for the momentum
+    beta2    - parameter for the momentum
+    epsilon  - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Kingma, Diederik P., and Jimmy Ba. "Adam: A method for stochastic 
+    optimization." arXiv preprint arXiv:1412.6980 (2014).
+    '''
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
@@ -447,6 +524,9 @@ def adam(func, x0, args,
         mk_hat = mk/(1-numpy.power(beta1,iternum))
         # compute bias-corrected first moment estimate
         vk_hat = vk/(1-numpy.power(beta2,iternum))
+
+#        printArray('stepsize*mk_hat/(sqrt(vk_hat)+epsilon) =',stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon))
+
         # iteration rule
         xk = xk_1 - stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon)
 
@@ -464,12 +544,19 @@ def adam(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
 
     return result
 
@@ -479,11 +566,35 @@ def adamax(func, x0, args,
            stepsize=1e-2,
            beta1=0.09,
            beta2=0.99,
-           thetaf=1e-1,
-           p=None,
            gradtol=1500,
            pathf=False,
+           plot=False,
+           plotset={},
            **kwargs):
+
+    '''
+    Adaptive moment estimation - based on Adam: Adam generalized to p-norms 
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    beta1    - parameter for the momentum
+    beta2    - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Kingma, Diederik P., and Jimmy Ba. "Adam: A method for stochastic 
+    optimization." arXiv preprint arXiv:1412.6980 (2014).
+    '''
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
@@ -516,6 +627,8 @@ def adamax(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+#        printArray('delta_x =', (stepsize/(1-numpy.power(beta1,iternum)))*mk/vk)
+
 
         # update path
         path[iternum] = fk
@@ -525,12 +638,20 @@ def adamax(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
 
     return result
 
@@ -541,7 +662,33 @@ def adagrad(func, x0, args,
             epsilon=1e-3,
             gradtol=1500,
             pathf=False,
+            plot=False,
+            plotset={},
             **kwargs):
+
+    '''
+    Adaptive gradient estimation
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    epsilon  - parameter for the gradient
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Duchi, John, Elad Hazan, and Yoram Singer. "Adaptive subgradient methods for
+    online learning and stochastic optimization." Journal of Machine Learning 
+    Research 12.Jul (2011): 2121-2159.
+    '''
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
@@ -569,6 +716,7 @@ def adagrad(func, x0, args,
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
+#        printArray('gk =', gk)
 
         # update path
         path[iternum] = fk
@@ -578,12 +726,20 @@ def adagrad(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
 
     return result
 
@@ -594,7 +750,31 @@ def adadelta(func, x0, args,
              epsilon=1e-8,
              gradtol=1500,
              pathf=False,
+             plot=False,
+             plotset={},
              **kwargs):
+
+    '''
+    Adaptive learning rate methode (learning rate = stepsize)
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    epsilon  - parameter for the gradient
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Zeiler, Matthew D. "ADADELTA: an adaptive learning rate method." arXiv 
+    preprint arXiv:1212.5701 (2012).
+    '''
 
     gradient   = kwargs['grad']
     stochagrad = kwargs['stochagrad']
@@ -641,23 +821,59 @@ def adadelta(func, x0, args,
         xk_1 = xk
         fk_1 = fk
 
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
     if (pathf==True):
-        if not (iternum==maxiter):
-            path = numpy.delete(path, range(iternum+1, maxiter)) 
         result = OptimizeResult(fun=path, x=xk, nit=iternum)
     else:
         result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
 
     return result
 
 
 def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
 
+    '''
+    Method to generate a hybrid optimization algorithm in a generic fashion.
+
+    Input:
+    stocha_opt_func : A desired stochastic optimization function, which is then
+                      used to get in a surrounding of a minimum (pointer to a 
+                      function)
+    scipy_opt_func  : A desired scipy optimization method, which is then used to
+                      generate convergence to the minimum (string of a scipy 
+                      method)
+
+    Output: hybrid optimization algorithm 
+    '''
+
     def scipy_stochastic_hybrid(func, x0, args=(), 
                                 options_s={},
                                 options_d={},
                                 plot=False,
                                 **kwargs):
+
+        '''
+        A hybrid optimization algorithm
+ 
+        Input:
+        func      - function to be optimized
+        x0        - initial value
+        args      - additional arguments for the func, is ignored within this 
+                    algo, but scipy requires this
+        options_s - solver options for the stochastic optimization function
+        options_d - solver options for the deterministic optimization function
+        plot      - iterations-functionvalue-plot if it is true
+
+        Output: OptimizeResult-object from scipy
+        '''
 
         if (len(options_s)==0):
             raise ValueError('There are no solver options for the stochastic \
@@ -692,7 +908,7 @@ def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
 
         # plot if desired
         if (plot==True):
-            plot2d(range(len(fun)), fun, ylog=True)
+            plot2d(range(len(fun)), fun, ylog=True, save=True)
         
         return result
     
@@ -716,7 +932,43 @@ def gradient_descent(func, x0, args=(),
             break
 
     printArray('gradient in gradient decsent for x_final = ', grad(xk))
+
     return OptimizeResult(fun=func(xk), x=xk, nit=iternum)
+
+
+def plot_meritfunction(func, x0, args=(), 
+                       disk=100,
+                       plotvar=0,
+                       interval=None,
+                       plotset={},
+                       **kwargs):
+
+    mf = numpy.empty(disk)
+    dim = len(x0)
+    x = x0
+    if (plotvar >= dim or 0 > plotvar):
+        raise ValueError('plotvar is out of range [0,len(x0)-1]')
+
+    lb = kwargs['bounds'].lb[plotvar]
+    ub = kwargs['bounds'].ub[plotvar]
+    if type(interval) is not numpy.ndarray:
+        if (interval == None):
+            interval = numpy.linspace(lb, ub, disk)
+        else:
+            raise ValueError('Something is wrong with interval')
+    else:
+        interval = numpy.linspace(interval[0], interval[1], disk)
+
+    for i in range(disk):
+        x[plotvar] = interval[i]
+        mf[i] = func(x)
+    
+    plot2d(interval, mf, **plotset)
+
+    x[plotvar] = interval[-1]
+
+    return OptimizeResult(fun=func(x), x=x, nit=disk)
+
 
 
 def test_minimize_neldermead(func, x0, args=(), 

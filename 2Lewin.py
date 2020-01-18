@@ -2,7 +2,6 @@
 # including the necessary classes, functions and libraries
 # by patrick, leandro, michael, lewin
 
-
 # lewin has created this file for testing some algorithms and to not change the 
 # original file (01_..), which is the main file for patricks changes (outsourcing
 # some functions and so on). i will use this file only for testing until the 
@@ -55,7 +54,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        adamax,
                                        adagrad,
                                        adadelta,
-                                       get_scipy_stochastic_hybrid)
+                                       get_scipy_stochastic_hybrid,
+                                       plot_meritfunction)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -79,8 +79,6 @@ from aux_merit_bundle import buildInitialbundle, get_bundle_merit
 
 # --- derivatives
 from derivatives import get_stochastic_grad
-
-
 
 
 #####################################NeuAnfang##################################
@@ -119,13 +117,14 @@ osa = OpticalSystemAnalysis(s, sysseq)
 
 
 # III ----------- defining raybundles for optimization and plotting 
-# rays_dict = fi1.get_rays_dict()
+rays_dict = fi1.get_rays_dict()
 
-rays_dict = {"startz":[-8], "starty": [0], "radius": [8],
-             "anglex": [0.05, 0.025, 0., -0.025, -0.05], 
-             "rasterobj":raster.RectGrid()}
+#rays_dict = {"startz":[0], "starty": [0], "radius": [16],
+#             "anglex": [0., 0.1832595], 
+#             "rasterobj":raster.RectGrid()}
+
 wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
-numrays = 50
+numrays = 20
 sample_param = 'wave'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
@@ -138,6 +137,7 @@ sample_param = 'wave'
 
 # ----- plot the original system
 # --- set the plot setting
+
 pn = np.array([1, 0, 0])
 up = np.array([0, 1, 0])
 
@@ -183,56 +183,77 @@ def osupdate(my_s):
 #                                  options={'maxiter': 100 , 'xatol': 1e-5,\
 #                                           'fatol': 1e-5})
 
-hybrid_method = get_scipy_stochastic_hybrid(stocha_opt_func=adam,
-                                            scipy_opt_func ='TNC') 
+#hybrid_method = get_scipy_stochastic_hybrid(stocha_opt_func=sgd,
+#                                            scipy_opt_func ='Newton-CG') 
 
-options={'gtol'     : 1e+1,
-         'plot'     : True, 
-         'options_d': {'maxiter': 100, 
-                       'xtol'   : 1e-5, 
-                       'ftol'   : 1e-5,
-                       'gtol'   : 1e+0,
-                       'disp'   : True},
-         'options_s': {'maxiter' : 100, 
-                       'stepsize': 1e-2, 
-                       'beta1'   : 0.1, 
-                       'beta2'   : 0.79,
-                       'gradtol' : 1500,
-                       'roh'     : 0.999,
-                       'epsilon' : 1e-2}}
+plotsettings = {'fig'      : 1,
+                'title'    : r'p_{i}-meritfunction-plot',
+                'xlabel'   : r'p_{i}',
+                'ylabel'   : 'meritfunctionvalue',
+                'legend'   : '',
+                'ylog'     : False,
+                'linestyle': '-o', 
+                'save'     : False,
+                'name'     : '',
+                'show'     : False}
+
+# options for stochastic optimization method
+# TODO: change the gradtol such that the stocha method and langrange/penalty 
+#       have the same termination condition
+# TODO: generalize the methods to plot more than one curve
+options_s1 = {'gtol'    : 1e+8,
+              'maxiter' : 100, 
+              'stepsize': 1e-7, 
+              'beta1'   : 0.1, 
+              'beta2'   : 0.99,
+              'gradtol' : 500,
+              'roh'     : 0.999,
+              'epsilon' : 1e-8,
+              'gamma'   : 0.1,
+              'methods' : 'nag',
+              'pathf'   : True,
+              'plot'    : False,
+              'plotset' : plotsettings}
+
+# options for deterministic optimization method
+options_d = {'maxiter': 150, 
+             'xtol'   : 1e-9, 
+             'ftol'   : 1e-5,
+             'gtol'   : 1e+1,
+             'disp'   : True}
+
+# options for hybrid optimization method
+# attention: for a hybrid optimization method you need to remove the gtol option
+#            in options_s
+#options={'gtol'     : 1e+3,
+#         'plot'     : True, 
+#         'options_d': options_d,
+#         'options_s': options_s}
 
 # ---- stochastic gradient descent
-opt_backend = ProjectScipyBackend(optimize_func=hybrid_method,
-                                  methodparam='penalty-lagrange',
-                                  stochagradparam=True,
-                                  options=options)
+opt_backend_1 = ProjectScipyBackend(optimize_func=sgd,
+                                    methodparam='penalty-lagrange',
+                                    stochagradparam=True,
+                                    options=options_s1)
 
 # ----- create optimizer object
-optimi = Optimizer(s,
-                   meritfunctionrms,
-                   backend=opt_backend,
-                   updatefunction=osupdate)
+optimi_1 = Optimizer(s,
+                     meritfunctionrms,
+                     backend=opt_backend_1,
+                     updatefunction=osupdate)
 
 fi1.store_data(s)
 fi1.write_to_file()
 
 # ----- start optimizing
-opt_backend.update_PSB(optimi)
+opt_backend_1.update_PSB(optimi_1)
 
-stochagrad = get_stochastic_grad(optimi, initialbundle, sample_param=sample_param)
-opt_backend.stochagrad = stochagrad
+stochagrad_1 = get_stochastic_grad(optimi_1, initialbundle, sample_param=sample_param)
+opt_backend_1.stochagrad = stochagrad_1
 
-s = optimi.run()
+s1 = optimi_1.run()
+
 #*******************************************************************************
-
-
-
-# print the final simplex, which are the meritfunction values
-# print("f simplex: ", opt_backend.res.final_simplex[1])
-# print("iterNum = ", opt_backend.res.nit)
-#
-#
-#
 ## V----------- plot the optimized system
 #
 ## --- plot the bundles and draw the system
@@ -246,3 +267,6 @@ plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 
 plt.show()
+fi1.store_data(s)
+fi1.write_to_file()
+

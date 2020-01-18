@@ -37,25 +37,15 @@ from pyrateoptics.optimize.optimize_backends import (ScipyBackend,
 from auxiliary_functions import error2squared, error1
 
 
-def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10, 
-                       wavelength=[0.587e-3]):
+def buildInitialbundle(osa, s, sysseq, rays_list, numrays, wavelength):
     '''
     Initialises the Initialbundles
     '''    
-    #Set defaults for dictionary
-    rays_dict.setdefault("startx", [0])
-    rays_dict.setdefault("starty", [0])
-    rays_dict.setdefault("startz", [-7])
-    rays_dict.setdefault("angley", [0])
-    rays_dict.setdefault("anglex", [0])
-    rays_dict.setdefault("rasterobj", raster.RectGrid())
-    rays_dict.setdefault("radius", [15])
-    
+
     # We want to build a Matrix with the initialbundles as entrys
     # get size of Matrix
     p = len(wavelength)
-    q = len(rays_dict["startx"])*len(rays_dict["starty"])*len(rays_dict["startz"])*\
-    len(rays_dict["angley"])*len(rays_dict["anglex"])*len(rays_dict["radius"])
+    q=len(rays_list)
     # initialize Matrix
     initialbundle = [[0 for x in range(p)] for y in range(q)]
     r2 = []
@@ -63,29 +53,30 @@ def buildInitialbundle(osa, s, sysseq, rays_dict, numrays=10,
     #Iterate over all entries
     counteri = 0
     counterj = 0
-    for i in rays_dict["startx"] :
-        for j in rays_dict["starty"] :
-            for k in rays_dict["startz"] :
-                for l in rays_dict["angley"] :
-                    for m in rays_dict["anglex"] :
-                        for n in rays_dict["radius"] :
-                            counterj = 0
-                            #Setup dict for current Bundle
-                            bundle_dict = {"startx":i, "starty":j, "startz":k,
-                                           "angley":l, "anglex":m, "radius":n,
-                                           "rasterobj":rays_dict["rasterobj"]}
-                            for o in wavelength :
-                                (o1, k1, E1) = osa.collimated_bundle(numrays,
-                                                            bundle_dict, wave=o)
-                                initialbundle[counteri][counterj] = \
-                                     RayBundle(x0=o1, k0=k1, Efield0=E1, wave=o)
-                                counterj = counterj + 1
-                            counteri = counteri + 1
+    for bundle in range(q):
+        i=rays_list[bundle]["startx"] 
+        j=rays_list[bundle]["starty"] 
+        k=rays_list[bundle]["startz"] 
+        l=rays_list[bundle]["angley"] 
+        m=rays_list[bundle]["anglex"] 
+        n=rays_list[bundle]["radius"] 
+        counterj = 0
+        #Setup dict for current Bundle
+        bundle_dict = {"startx":i, "starty":j, "startz":k,
+                       "angley":l, "anglex":m, "radius":n,
+                       "rasterobj":rays_list[bundle]["raster"]}
+        for o in wavelength :
+            (o1, k1, E1) = osa.collimated_bundle(numrays,
+                                        bundle_dict, wave=o)
+            initialbundle[counteri][counterj] = \
+                 RayBundle(x0=o1, k0=k1, Efield0=E1, wave=o)
+            counterj = counterj + 1
+        counteri = counteri + 1
     return initialbundle
 
 def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                      wavelength=[0.587e-3], whichmeritfunc='standard',
-                     error='error2', sample_param='wave', penalty=False):
+                     error='error2', sample_param='wave', penalty=True):
     """
     initializes the initialBundles and forms the meritfunction
     this is necessary as the meritfunction needs the initalbundle, but in the 
@@ -95,6 +86,16 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
     initialbundle = buildInitialbundle(osa, s, sysseq, rays_dict, 
                                        numrays, wavelength)
+    # determine the number of bundles
+    numbundles = len(initialbundle)
+    # determine the true number of rays of a bundle
+    # in general numrays_true != numrays holds
+    numrays_true = initialbundle[0][0].x.shape[2]
+    # determine the number of different wavelengths, here the assumption is made
+    # that all bundles are created for the same number of different wavelength
+    numwaves   = len(initialbundle[0])
+    # calculate the number of rays for a bundle for all different wavelengths
+    numrays_waves = numwaves*numrays_true
 
     # --- define meritfunctions:
     # You can add your meritfunctionsrms-implementation and then add it to 
@@ -111,11 +112,12 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
         res = 0
 
         # Loop over all bundles
-        for i in range(0, len(initialbundle)):
+        for i in range(0, numbundles):
             x = np.array([])
             y = np.array([])
+
             # Loop over wavelenghts
-            for j in range(0, len(initialbundle[0])):
+            for j in range(0, numwaves):
                 my_initialbundle = copy.copy(initialbundle[i][j])
                 rpaths = my_s.seqtrace(my_initialbundle, sysseq)
 
@@ -128,18 +130,20 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
             xmean = np.mean(x)
             ymean = np.mean(y)
 
+            # this could be simplified, for the sake of clarity we do not
+            if (penalty == True):
+                res += (math.exp(numrays_true/(len(x)+1e-1))-\
+                        math.exp(numrays_true/(numrays_true+1e-1)))
+
             # Choose error function
             if (error == 'error2'):
-                res += error2squared(x, xmean, y, ymean, penalty=penalty)
+                res += error2squared(x, xmean, y, ymean)
             elif (error == 'error1'):
-                res += error1(x, xmean, y, ymean, penalty=penalty)
+                res += error1(x, xmean, y, ymean)
 
         return res
 
     # ---------------sgd meritfunction
-    wavel   = len(initialbundle[0])
-    numrays = initialbundle[0][0].x.shape[2]
-
     def meritfunctionrms_sgd(my_s, **kwargs):
         if (len(kwargs) == 0):
             return meritfunctionrms_standard(my_s)
@@ -155,8 +159,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
             if (sample_param == 'bundle'):
                 sample_initialbundle = initialbundle[sample_num]
             if (sample_param == 'wave'):
-                sample_initialbundle = [initialbundle[sample_num//wavel]\
-                                                     [sample_num%wavel]]
+                sample_initialbundle = [initialbundle[sample_num//numwaves]\
+                                                     [sample_num%numwaves]]
             if (sample_param == 'ray'):
                 # TODO:
                 # this option can cause an error, because the number of rays 
@@ -165,12 +169,14 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 # hit the image plane. Because of that a random number can be 
                 # drawn but there is no associated ray. the mask, which has then
                 # the wrong size will cause an error.
-                bundlenum = sample_num//(wavel*numrays)
-                wavenum   = (sample_num-wavel*numrays*bundlenum)//numrays
-                raynum    = sample_num-wavel*numrays*bundlenum-numrays*wavenum
+                bundlenum = sample_num//(numwaves*numrays_true)
+                wavenum   = (sample_num-numwaves*numrays_true*bundlenum)//\
+                            numrays_true
+                raynum    = sample_num-numwaves*numrays_true*bundlenum-\
+                            numrays_true*wavenum
 
                 sample_initialbundle = [initialbundle[bundlenum][wavenum]]
-                mask = np.zeros(numrays, dtype=bool)
+                mask = np.zeros(numrays_true, dtype=bool)
                 mask[raynum] = True
 
             # Loop over sample_initialbundle
@@ -195,11 +201,16 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                     x = x[mask]
                     y = y[mask]
 
+                # this could be simplified, for the sake of clarity we do not
+                if (penalty == True):
+                    res += (math.exp(numrays_true/(len(x)+1e-1))-\
+                            math.exp(numrays_true/(numrays_true+1e-1)))
+
                 # Choose error function
                 if (error == 'error2'):
-                    res += error2squared(x, xmean, y, ymean, penalty=penalty)
+                    res += error2squared(x, xmean, y, ymean)
                 elif (error == 'error1'):
-                    res += error1(x, xmean, y, ymean, penalty=penalty)
+                    res += error1(x, xmean, y, ymean)
 
             return res
 

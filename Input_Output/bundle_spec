@@ -1,0 +1,6 @@
+#All bundles in file bundle_input are created with #numrays and all defined wavelenths
+#If you want define more wavelengths, use the & symbol e.g. 0.1&0.2&0.3
+
+#numrays    wavelengths
+20          0.5875618e-3&0.4861327e-3&0.6562725e-3
+

@@ -72,16 +72,17 @@ class inout:
         #Take care if you change the bundle_input file. The order below
         #hast to represent the order of the bundle_input file
         self.ray_order=["startx","starty","startz",\
-                "radius","anglex","angley",\
-                "numrays","wavelength","raster"]
+                "radius","anglex","angley","raster"]
         self.surfaces=np.genfromtxt(self.globpath+"surface_input",dtype=None,\
                 comments="#")
         self.rays=np.genfromtxt(self.globpath+"bundle_input",dtype=None,\
                 comments="#").tolist()
+        self.rays_spec=np.genfromtxt(self.globpath+"bundle_spec",dtype=None,\
+                comments="#").tolist()
+        self.numrays=self.rays_spec[0]
+        self.wavelengths=self.convert_2_list(self.rays_spec[1])
         self.material=[]
         self.SurfNameList=[]
-        #take care: it is necessaray that here stands the "normal" variable name 
-        #added with an var. all possible varialbe items have to mentioned below 
 
     def set_add(self):
         self.mode=0
@@ -187,7 +188,10 @@ class inout:
     def get_sufval(self, name, index):
         return self.surfaces[index][self.surface_order.index(name)]
 
-    def get_rayval(self,name):
+    def get_rayval(self, name, index):
+        return self.rays[index][self.ray_order.index(name)]
+
+    def get_rayval_tupel(self, name):
         return self.rays[self.ray_order.index(name)]
 
     #this function creates for every surface (defined in the surface_input file) one coordinate system, and returns a list of them
@@ -315,32 +319,57 @@ class inout:
         return sysseq 
 
     #returns the dictionary which represents the ray bundles 
+    #def get_rays_dict(self):
+    #    rays_dict={}
+    #    for i in range(len(self.ray_order)):
+    #        value=self.get_rayval(self.ray_order[i])
+    #        name=self.ray_order[i]
+    #        if isinstance(value,int):
+    #            rays_dict[name]=[value]
+    #        elif name=="raster":
+    #            if(value=="RectGrid"):
+    #                rays_dict[name]=raster.RectGrid()
+    #        else:    
+    #            rays_dict[self.ray_order[i]]=self.convert_2_list(value)
+    #    return rays_dict 
+    
+    #returns a list with all bundle dictionarys which represents the ray bundles 
     def get_rays_dict(self):
-        rays_dict={}
-        for i in range(len(self.ray_order)):
-            value=self.get_rayval(self.ray_order[i])
-            name=self.ray_order[i]
-            if isinstance(value,int):
-                rays_dict[name]=[value]
-            elif name=="raster":
-                if(value=="RectGrid"):
-                    rays_dict[name]=raster.RectGrid()
-            else:    
-                rays_dict[self.ray_order[i]]=self.convert_2_list(value)
-        return rays_dict 
+        rays_list=[]
+        if(type(self.rays)==list):
+            for line in range(len(self.rays)):
+                dummy_dict={}
+                for i in range(len(self.ray_order)):
+                    value=self.get_rayval(self.ray_order[i], line)
+                    name=self.ray_order[i]
+                    if not isinstance(value,str):
+                        dummy_dict[name]=value
+                    elif name=="raster":
+                        if(value=="RectGrid"):
+                            dummy_dict[name]=raster.RectGrid()
+                rays_list.append(dummy_dict)
+        else:
+            for i in range(len(self.ray_order)):
+                value=self.get_rayval_tupel(self.ray_order[i])
+                name=self.ray_order[i]
+                if not isinstance(value,str):
+                    dummy_dict[name]=value
+                elif name=="raster":
+                    if(value=="RectGrid"):
+                        dummy_dict[name]=raster.RectGrid()
+            rays_list.append(dummy_dict)
+
+        return rays_list 
 
 def str_to_class(classname):
     return getattr(sys.modules[__name__], classname)
 
 
-def error2squared(x, x_ref, y, y_ref, penalty=False):
+def error2squared(x, x_ref, y, y_ref):
     '''
     computes the squared
     '''
-    if penalty:
-        res = np.sum((x - x_ref)**2 + (y - y_ref)**2) + 10.*math.exp(-len(x))
-    else:
-        res = np.sum((x - x_ref)**2 + (y - y_ref)**2) 
+    res = np.sum((x - x_ref)**2 + (y - y_ref)**2) 
 
     return res
 
@@ -350,11 +379,7 @@ def error1(x, x_ref, y, y_ref, penalty=False):
     computes the 
     L1-error = sum_{i=1 to #rays}(||(x_i, y_i)^T - (x_ref, y_ref)^T||_1)
     '''
-    if penalty:
-        res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))\
-              + 10.*math.exp(-len(x))
-    else:
-        res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))
+    res = np.sum(np.absolute(x - x_ref) + np.absolute(y - y_ref))
 
     return res
 
@@ -609,9 +634,6 @@ def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
     epsilon = math.pow(thetaf, 1/2)*(1+np.linalg.norm(xk, p))
     delta   = math.pow(thetaf, 1/3)*(1+np.absolute(fk))
 
-    print('fk      = %7.4f' %(fk))
-#    printArray('gk      =\n', gk)
-    
     # In the literature it is not the absolute value of fk_1-fk, but for 
     # algorithm which does not go to a descent direction in every step the 
     # absolute value is necessary
@@ -625,6 +647,7 @@ def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
 
 
 def plot2d(xarray, yarray,
+           fig=1,
            title='',
            fonttitle=14,
            xlabel='',
@@ -639,10 +662,19 @@ def plot2d(xarray, yarray,
            ylog=False,
            grid=True,
            linewidth=2,
-           linestyle='-o'):
+           linestyle='-o',
+           markersize=2,
+           save=False,
+           name='plot2d.png',
+           show=False,
+           *args):
 
-    plt.figure()
-    plt.plot(xarray, yarray, linestyle, lw=linewidth, label=legend)
+    plt.figure(fig)
+    plt.plot(xarray, yarray, 
+             linestyle, 
+             lw=linewidth, 
+             markersize=markersize, 
+             label=legend)
     # axis
     plt.xlabel(xlabel, fontsize=fontaxis)
     plt.ylabel(ylabel, fontsize=fontaxis)
@@ -665,7 +697,11 @@ def plot2d(xarray, yarray,
     plt.legend(loc=loclegend, prop={'size': fontlegend})
     # set grid
     plt.grid(grid)
+    # safe 
+    if (save==True):
+        plt.savefig(name)
     # plot
-    plt.show()
+    if (show==True):
+        plt.show()
 
 

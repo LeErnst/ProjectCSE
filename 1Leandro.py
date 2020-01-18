@@ -171,7 +171,7 @@ def osupdate(my_s):
 # for problems increase the stepsize
 opt_backend = ProjectScipyBackend(optimize_func='cg',#differential-evolution',#nelder-mead',#test_minimize_neldermead,
                                   methodparam='penalty-lagrange',
-                                  options={'maxiter': 12, 'gtol':1})#,
+                                  options={'maxiter': 150, 'gtol':1e-2})#,
                                             #'xatol': 1e-14,
                                             #'fatol': 1e-14})
 
@@ -192,6 +192,8 @@ fi1.write_to_file() #am ende einmal in ne datei schreiben
 ## ----- start optimizing
 opt_backend.update_PSB(optimi)
 s = optimi.run()
+print('ANZAHL FUNKTIONSAUFRUFE GESAMT:')
+print(optimi.NoC)
 #*******************************************************************************
 #*******************************************************************************
 #*******************************************************************************
