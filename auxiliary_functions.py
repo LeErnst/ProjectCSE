@@ -4,6 +4,8 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import matplotlib
+from mpl_toolkits import mplot3d
+from matplotlib import cm
 
 from pyrateoptics.raytracer.optical_system              import OpticalSystem
 from pyrateoptics.raytracer.optical_element             import OpticalElement
@@ -697,6 +699,63 @@ def plot2d(xarray, yarray,
     plt.legend(loc=loclegend, prop={'size': fontlegend})
     # set grid
     plt.grid(grid)
+    # safe 
+    if (save==True):
+        plt.savefig(name)
+    # plot
+    if (show==True):
+        plt.show()
+
+
+def plot3d(X, Y, Z,
+           fig=1,
+           title='',
+           fonttitle=14,
+           xlabel='',
+           ylabel='',
+           zlabel='',
+           fontaxis=12,
+           xlim='auto',
+           ylim='auto',
+           zlim='auto',
+           xlog=False,
+           ylog=False,
+           zlog=False,
+           grid=True,
+           save=False,
+           name='plot3d.png',
+           show=False,
+           *args):
+
+    fig = plt.figure(fig)
+    ax = plt.axes(projection='3d')
+    # set plot
+    ax.plot_surface(X, Y, Z, cmap=cm.coolwarm)
+    # axis
+    ax.set_xlabel(xlabel, fontsize=fontaxis)
+    ax.set_ylabel(ylabel, fontsize=fontaxis)
+    ax.set_zlabel(zlabel, fontsize=fontaxis)
+    # log scale
+    if (xlog==True):
+        ax.set_xscale('log')
+    if (ylog==True):
+        ax.set_yscale('log')
+    if (zlog==True):
+        ax.set_zscale('log')
+    # set xlim and ylim
+    if not (xlim=='auto'):
+        ax.set_xlim(xlim[0],xlim[1])
+    if not (ylim=='auto'):
+        ax.set_ylim(ylim[0],ylim[1])
+    if not (zlim=='auto'):
+        ax.set_zlim(zlim[0],zlim[1])
+    # title
+    # remark: matplotlib accepts Tex $ $-expressions,
+    #         like plt.title(r'$\sigma_{i}=15$'), where the r indicates that the
+    #         backslash is not to treat like in python, but in latex
+    ax.set_title(title, fontsize=fonttitle)
+    # set grid
+    ax.grid(grid)
     # safe 
     if (save==True):
         plt.savefig(name)
