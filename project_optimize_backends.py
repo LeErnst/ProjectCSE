@@ -1581,7 +1581,7 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     tolError = 1e-3
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
-    Np = 50          # population size
+    Np = 3*m          # population size
     xbest = x0
     fbest = func(xbest)
     bounds = unknown_options['bounds']
@@ -1600,7 +1600,7 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     stopTol = 0
     it = 0
     
-    #while it<Ng and stopTol<stopNum:  
+    #while it<Ng: 
     while it<Ng:
         # Update population:
         R = [[] for i in range(n)]          # initialization of population list R
@@ -1670,7 +1670,7 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
 
 
-def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=3,**unknown_options):
+def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
     # algorithm based on population based incremental learning
     # Np = population size; Ng = number of generations; 
     # m = subintervalls between lower bound and upper bound
@@ -1769,7 +1769,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=3,**unknown_options):
     tolError = 1e-3
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
-    Np = 50          # population size
+    Np = 3*m          # population size
     #xbest = x0
     #fbest = func(xbest)
     xbest = numpy.empty(n)
@@ -1790,7 +1790,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=3,**unknown_options):
     stopTol = 0
     it = 0
     
-    #while it<Ng and stopTol<stopNum:  
+    #while it<Ng:  
     while it<Ng:
         # Update subpopulation with (Np/2) individuals:
         R = [[] for i in range(n)]          # initialization of population list R
@@ -1839,7 +1839,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=3,**unknown_options):
         swarm.sort(key=lambda x: x.f)
 
         # Update xbest:
-        if (swarm[0].f <= fbest):
+        if (swarm[0].f < fbest):
             fbest = swarm[0].f
             xbest = swarm[0].pos
             print("Verbesserung durch AGM")
@@ -1865,7 +1865,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=3,**unknown_options):
         swarm.sort(key=lambda x: x.f)
 
         # Update xbest:
-        if (swarm[0].f <= fbest):
+        if (swarm[0].f < fbest):
             fbest = swarm[0].f
             xbest = swarm[0].pos
             print("Verbesserung durch EDO")
