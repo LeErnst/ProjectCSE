@@ -13,7 +13,7 @@ from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
 from derivatives import grad, grad_pen, grad_lag, grad_log, hessian
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
-                                termcondition, plot2d
+                                termcondition, plot2d, plot3d
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=2.0,
@@ -936,12 +936,12 @@ def gradient_descent(func, x0, args=(),
     return OptimizeResult(fun=func(xk), x=xk, nit=iternum)
 
 
-def plot_meritfunction(func, x0, args=(), 
-                       disk=100,
-                       plotvar=0,
-                       interval=None,
-                       plotset={},
-                       **kwargs):
+def plot2d_meritfunction(func, x0, args=(), 
+                         disk=100,
+                         plotvar=0,
+                         interval=None,
+                         plotset={},
+                         **kwargs):
 
     mf = numpy.empty(disk)
     dim = len(x0)
@@ -965,7 +965,57 @@ def plot_meritfunction(func, x0, args=(),
     
     plot2d(interval, mf, **plotset)
 
-    x[plotvar] = interval[-1]
+    return OptimizeResult(fun=func(x), x=x, nit=disk)
+
+
+def plot3d_meritfunction(func, x0, args=(), 
+                         disk=100,
+                         plotvar1=0,
+                         plotvar2=1,
+                         interval1=None,
+                         interval2=None,
+                         plotset={},
+                         **kwargs):
+
+    mf = numpy.empty((disk, disk))
+    dim = len(x0)
+    x = x0
+
+    if (plotvar1 >= dim or 0 > plotvar1):
+        raise ValueError('plotvar[0] is out of range [0,len(x0)-1]')
+
+    if (plotvar2 >= dim or 0 > plotvar2):
+        raise ValueError('plotvar[1] is out of range [0,len(x0)-1]')
+
+    lb1 = kwargs['bounds'].lb[plotvar1]
+    ub1 = kwargs['bounds'].ub[plotvar1]
+    lb2 = kwargs['bounds'].lb[plotvar2]
+    ub2 = kwargs['bounds'].ub[plotvar2]
+
+    if type(interval1) is not numpy.ndarray:
+        if (interval1 == None):
+            interval1 = numpy.linspace(lb1, ub1, disk)
+        else:
+            raise ValueError('Something is wrong with interval1')
+    else:
+        interval1 = numpy.linspace(interval1[0], interval1[1], disk)
+
+    if type(interval2) is not numpy.ndarray:
+        if (interval2 == None):
+            interval2 = numpy.linspace(lb2, ub2, disk)
+        else:
+            raise ValueError('Something is wrong with interval2')
+    else:
+        interval2 = numpy.linspace(interval2[0], interval2[1], disk)
+
+    for i in range(disk):
+        x[plotvar1] = interval1[i]
+        for j in range(disk):
+            x[plotvar2] = interval2[j]
+            mf[j,i] = func(x)
+    
+    X, Y = numpy.meshgrid(interval1, interval2)
+    plot3d(X, Y, mf, **plotset)
 
     return OptimizeResult(fun=func(x), x=x, nit=disk)
 

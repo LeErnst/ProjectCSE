@@ -55,7 +55,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        adagrad,
                                        adadelta,
                                        get_scipy_stochastic_hybrid,
-                                       plot2d_meritfunction)
+                                       plot2d_meritfunction,
+                                       plot3d_meritfunction)
 
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
@@ -124,16 +125,16 @@ rays_dict = fi1.get_rays_dict()
 #             "anglex": [0., 0.1832595], 
 #             "rasterobj":raster.RectGrid()}
 
-wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
-numrays = 20
+#wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
+#numrays = 50
 sample_param = 'wave'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
-                                                     numrays, wavelength, 
+                                                     fi1.numrays, fi1.wavelengths, 
                                                      whichmeritfunc='sgd', 
                                                      error='error2',
                                                      sample_param=sample_param,
-                                                     penalty=True)
+                                                     penalty=False)
 
 
 # ----- plot the original system
@@ -154,6 +155,7 @@ ax2.axis('equal')
 testbundle = deepcopy(initialbundle)
 plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
+
 # IV ----------- optimization
 # ----- define optimizable variables
 #######################################NeuAnfang################################
@@ -172,67 +174,26 @@ def osupdate(my_s):
 
 # possible methodparams = {standard, penalty, penalty-lagrange, log}
 
-# ---- gradient descent
-# for problems increase the stepsize
-#opt_backend = ProjectScipyBackend(optimize_func=gradient_descent,
-#                                  methodparam='penalty-lagrange',
-#                                  options={})
+plotsettings = {'fig'       : 3,
+                'title'     : 'curvature-curvature-meritfunction-plot surf4/surf8',
+                'xlabel'    : 'curvature surf4',
+                'ylabel'    : 'curvature surf8',
+                'zlabel'    : 'meritfunctionvalue',
+                'save'      : False,
+                'name'      : '',
+                'show'      : False}
 
-# ---- own neldermead
-#opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,
-#                                  methodparam='penalty-lagrange',
-#                                  options={'maxiter': 100 , 'xatol': 1e-5,\
-#                                           'fatol': 1e-5})
+# options for meritfunctionplot
+options_s1 = {'gtol'     : 1e+10,
+              'disk'     : 50,
+              'plotvar1' : 9,
+              'plotvar2' : 10,
+              'interval1': None,
+              'interval2': None,
+              'plotset'  : plotsettings}
 
-#hybrid_method = get_scipy_stochastic_hybrid(stocha_opt_func=sgd,
-#                                            scipy_opt_func ='Newton-CG') 
-
-plotsettings = {'fig'      : 1,
-                'title'    : r'p_{i}-meritfunction-plot',
-                'xlabel'   : r'p_{i}',
-                'ylabel'   : 'meritfunctionvalue',
-                'legend'   : '',
-                'ylog'     : False,
-                'linestyle': '-o', 
-                'save'     : False,
-                'name'     : '',
-                'show'     : False}
-
-# options for stochastic optimization method
-# TODO: change the gradtol such that the stocha method and langrange/penalty 
-#       have the same termination condition
-# TODO: generalize the methods to plot more than one curve
-options_s1 = {'gtol'    : 1e+8,
-              'maxiter' : 100, 
-              'stepsize': 1e-7, 
-              'beta1'   : 0.1, 
-              'beta2'   : 0.99,
-              'gradtol' : 500,
-              'roh'     : 0.999,
-              'epsilon' : 1e-8,
-              'gamma'   : 0.1,
-              'methods' : 'nag',
-              'pathf'   : True,
-              'plot'    : False,
-              'plotset' : plotsettings}
-
-# options for deterministic optimization method
-options_d = {'maxiter': 150, 
-             'xtol'   : 1e-9, 
-             'ftol'   : 1e-5,
-             'gtol'   : 1e+1,
-             'disp'   : True}
-
-# options for hybrid optimization method
-# attention: for a hybrid optimization method you need to remove the gtol option
-#            in options_s
-#options={'gtol'     : 1e+3,
-#         'plot'     : True, 
-#         'options_d': options_d,
-#         'options_s': options_s}
-
-# ---- stochastic gradient descent
-opt_backend_1 = ProjectScipyBackend(optimize_func=sgd,
+# ---- 
+opt_backend_1 = ProjectScipyBackend(optimize_func=plot3d_meritfunction,
                                     methodparam='penalty-lagrange',
                                     stochagradparam=True,
                                     options=options_s1)
@@ -254,15 +215,15 @@ opt_backend_1.stochagrad = stochagrad_1
 
 s1 = optimi_1.run()
 
+
+#plt.show()
+
 #*******************************************************************************
 ## V----------- plot the optimized system
 #
 ## --- plot the bundles and draw the system
 plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ##
-# --- draw spot diagrams
-# plotSpotDia(osa, numrays, rays_dict, wavelength)
-
 
 # get a look at the vars
 ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)

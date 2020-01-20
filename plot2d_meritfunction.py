@@ -55,7 +55,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        adagrad,
                                        adadelta,
                                        get_scipy_stochastic_hybrid,
-                                       plot_meritfunction)
+                                       plot2d_meritfunction)
+
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -200,7 +201,7 @@ for (logy, plotvar, legend, interval) in [var_list[3]]:
                   'plotset' : plotsettings}
     
     # ---- 
-    opt_backend_1 = ProjectScipyBackend(optimize_func=plot_meritfunction,
+    opt_backend_1 = ProjectScipyBackend(optimize_func=plot2d_meritfunction,
                                         methodparam='penalty-lagrange',
                                         stochagradparam=True,
                                         options=options_s1)
