@@ -1106,7 +1106,7 @@ def test_minimize_neldermead(func, x0, args=(),
                           final_simplex=(sim, fsim))
 
 
-def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
+def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-5,\
                             **unknown_options):
     #---------------------------------------------------------------------------
     def Cf(x,lb,ub):                        # Constraint fitness priority-based ranking method
@@ -1286,7 +1286,7 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
 
 
 def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
-                 c0=None,c1=2.0,c2=2.0,typ=4,S=30,**unknown_options):
+                 c0=None,c1=2.0,c2=2.0,typ=3,S=15,**unknown_options):
     # Typ 1: Updating with global best and best of 2-neighborhood
     # Typ 2: Updating with global best and individual best since start
     # Typ 4: same as typ 1 but in PSO all particles are updated
@@ -1328,7 +1328,7 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             Cf += weight*C[t]
         return Cf
 
-    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,MaxIt=100,tolError=1e-4):
+    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,MaxIt=100,tolError=1e-6):
     # Nelder-Mead for constraint optimization
     # initial_simplex should be array of shape (N+1,N) with N: problem size
         alpha = 1
@@ -1354,9 +1354,13 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
         error *= 1/(float(n)+1)
 
         it = 1
+
+        # sort xfC from low to high f(x) values
+        xfC = sorted(xfC,key=lambda elem: elem[1])
+
         while (it <= MaxIt and error > tolError):
-            # sort xfC from low to high f(x) values
-            xfC = sorted(xfC,key=lambda elem: elem[1])
+            ## sort xfC from low to high f(x) values
+            #xfC = sorted(xfC,key=lambda elem: elem[1]) # kann geloescht werden
             # Reflection:
             # Determine x_cent without x_high:
             x_cent = numpy.zeros(n)
@@ -1472,6 +1476,9 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
                 error += (xfC[t][1]-f_mean)**2
             error *= 1/(float(n)+1)   
 
+            # sort xfC from low to high f(x) values
+            xfC = sorted(xfC,key=lambda elem: elem[1])
+
         final_simplex = numpy.empty([n+1,n])
         for t in range(n+1):
             final_simplex[t] = xfC[t][0]
@@ -1561,6 +1568,7 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
 
     xarray = []
     yarray = []
+    xBest_old = numpy.zeros(n)      # needed for check "Abstand ..." in first loop run
 
     while (k <= maxiter):
         #Evaluate solutions and apply Repair Method if not in feasible region:
@@ -1588,25 +1596,49 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             xBest_f = liste[0][1]
         
         print("bestes f = ", xBest_f)
+        print("Abstand zwischen alter und neuer Loesung: ", numpy.linalg.norm(xBest-xBest_old))
+        xBest_old = xBest
 
         stopCrit = stopCrit+1
 
-        # check stopping criteria:
+        # check stopping criteria: ---------------------------------------------
         if (k==maxiter):
+            print("Merit Final nach PSO_NM = ", xBest_f)
+            print("xBest nach PSO_NM = ", xBest)
+            print("Norm Gradient nach PSO_NM = ", \
+                numpy.linalg.norm(grad(func,xBest,math.sqrt(numpy.finfo(float).eps))))
+            
+            def jaco(x):
+                h = math.sqrt(numpy.finfo(float).eps)
+                return grad(func,x,h)
+
+            Res = minimize(func,xBest,args=(),method='TNC',jac=jaco, \
+                    bounds=bounds,options={"maxiter":500,"disp":True})
+            print("Merit nach lokaler Suche = ", Res.fun)
+            print("x nach lokaler Suche = ", Res.x)
+            print("Norm Gradient nach lokaler Suche = ", \
+                numpy.linalg.norm(grad(func,Res.x,math.sqrt(numpy.finfo(float).eps))))
+
+            if (Res.fun < xBest_f):
+                xBest_f = Res.fun
+                xBest = Res.x
 
             return OptimizeResult(fun=xBest_f, x=xBest, nit = k)
             break
-
+        #-----------------------------------------------------------------------
         # Apply Nelder-Mead to the (n+1) best particles:
         initial_simplex = numpy.empty([n+1,n])
         for i in range(n+1):
             initial_simplex[i] = swarm[liste[i][0]].pos
         final_simplex = nelder_mead_con(initial_simplex,func,Cf,bounds.lb,bounds.ub)
         # Update (n+1)th particle:
-        for i in range(n+1):
-            parti = liste[i][0]
-            swarm[parti].updatePos(final_simplex[i])
-            liste[i][1] = swarm[parti].pos_f
+                                    #for i in range(n+1):
+                                    #    parti = liste[i][0]
+                                    #    swarm[parti].updatePos(final_simplex[i])
+                                    #    liste[i][1] = swarm[parti].pos_f
+        parti = liste[n][0]
+        swarm[parti].updatePos(final_simplex[0])
+        liste[n][1] = swarm[parti].pos_f
 
         # Update liste:
         liste = sorted(liste,key=lambda elem: elem[1])
@@ -1788,7 +1820,7 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
 
 
-def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
+def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
     # algorithm based on population based incremental learning
     # Np = population size; Ng = number of generations; 
     # m = subintervalls between lower bound and upper bound
@@ -1815,13 +1847,13 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
         NewPart = []        # list for new particle objects
 
         check = 0
-        beta1 = random.uniform(1e-9,1e-6)
+        beta1 = random.uniform(1e-6,1e-4)
         Pos = xbest + beta1*s
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
         else:
             check = 1
-        beta2 = random.uniform(1e-9,1e-6)
+        beta2 = random.uniform(1e-6,1e-4)
         Pos = xbest + beta2*s
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
@@ -1887,7 +1919,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
     tolError = 1e-3
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
-    Np = 3*m          # population size
+    Np = 255            # population size
     #xbest = x0
     #fbest = func(xbest)
     xbest = numpy.empty(n)
@@ -1907,6 +1939,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
 
     stopTol = 0
     it = 0
+    r_alt = numpy.zeros(n)
     
     #while it<Ng:  
     while it<Ng:
@@ -1999,6 +2032,8 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
                     r[i] = j
                     break
         
+        print("Abstand Intervall xBest_alt zu xBest_neu = ",numpy.linalg.norm(r-r_alt))
+        r_alt = r
         #print("P alt = ", P)
         #print("r = ", r)
 
@@ -2018,6 +2053,11 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
 
         #print("P neu = ",P)
         it += 1
+        
+        PBestInt = 0
+        for i in range(n):
+            PBestInt += P[i,int(r[i])]
+        print("Summe P_best = ", PBestInt)
                 
 
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
