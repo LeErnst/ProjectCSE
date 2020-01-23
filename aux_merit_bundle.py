@@ -115,6 +115,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
         for i in range(0, numbundles):
             x = np.array([])
             y = np.array([])
+            xChief = np.array([])
+            yChief = np.array([])
 
             # Loop over wavelenghts
             for j in range(0, numwaves):
@@ -125,10 +127,19 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 # to caculate mean
                 x = np.append(x, rpaths[0].raybundles[-1].x[-1, 0, :])
                 y = np.append(y, rpaths[0].raybundles[-1].x[-1, 1, :])
-            
+
+                # compute Chief ray for this wavelength
+                if (len(rpaths[0].raybundles[-1].x[-1,0])>0):
+                    xChief = np.append(xChief, rpaths[0].raybundles[-1].x[-1,0,0])
+                if (len(rpaths[0].raybundles[-1].x[-1,1])>0):            
+                    yChief = np.append(yChief, rpaths[0].raybundles[-1].x[-1,1,0])
             # Add up all the mean values of the different wavelengths
-            xmean = np.mean(x)
-            ymean = np.mean(y)
+            #xmean = np.mean(x)
+            #ymean = np.mean(y)
+
+            # compute mean value of all chief ray points
+            xChiefMean = np.mean(xChief)
+            yChiefMean = np.mean(yChief)
 
             # this could be simplified, for the sake of clarity we do not
             if (penalty == True):
@@ -137,9 +148,11 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
 
             # Choose error function
             if (error == 'error2'):
-                res += error2squared(x, xmean, y, ymean)
+                #res += error2squared(x, xmean, y, ymean)
+                res += error2squared(x,xChiefMean,y,yChiefMean)
             elif (error == 'error1'):
-                res += error1(x, xmean, y, ymean)
+                #res += error1(x, xmean, y, ymean)
+                res += error1(x,xChiefMean,y,yChiefMean)
 
         return res
 
