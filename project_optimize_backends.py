@@ -1286,29 +1286,33 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-5,\
                             final_simplex=final_simplex)
 
 
-def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
-                 c0=None,c1=2.0,c2=2.0,typ=1,S=25,**unknown_options):
+def PSO_NM_1(func,x0,args=(),maxiter=100,c0=None,c1=2.0,c2=2.0,\
+             typ=1,S=25,\
+             maxIt_NM=100,tol_NM=1e-6,\
+             improve=True,\
+             stopNumber=10, stopTol=0.1,**unknown_options):
     # Typ 1: Updating with global best and best of 2-neighborhood
     # Typ 2: Updating with global best and individual best since start
+    # Typ 3: Population is divided in S Subpopulations
     # Typ 4: same as typ 1 but in PSO all particles are updated
-    # N = population size (has to be: N >= 2n+1; with n=problem size)
-    # vel_max = maximal velocity of a particle
     # c0,c1 and c2 are variables for updating the velocity of the particles
-    # S: number of neighborhoods
-
-    #rm is a method which brings a solution x in a infeasible region ...
-    #to a feasible region
+    # S: number of neighborhoods/subpopulations
+    # MaxIt_NM: max number of iterations for Nelder-Mead
+    # tol_NM: stopping criteria for Nelder-Mead (tolerance)
+    # improve: if true, "TNC" is applied to best find solution to improve solution
+    # if fBest doesn't decrease about (stopTol*100)% in stopNumber iterations -> stop
+    
+    # subfunctions needed:
     #---------------------------------------------------------------------------
     def rm(x,lb,ub,vel_max):                      # repair method (later grad.bas.r.m)
-        # moves positions on bounds if they don't be in the feasible region
-        # ACHTUNG: angepasst mit vel_max
+        # moves particles on bounds if they don't be in the feasible region
         from copy import deepcopy
         x_neu = deepcopy(x)
         for t in range(len(x)):
             if (x[t]<lb[t]):
-                x_neu[t] = lb[t] #+ 2*vel_max[t]
+                x_neu[t] = lb[t] 
             if (x[t]>ub[t]):
-                x_neu[t] = ub[t] #- 2*vel_max[t]
+                x_neu[t] = ub[t] 
         return x_neu
 
     def Cf(x,lb,ub):                        # Constraint fitness priority-based ranking method
@@ -1329,14 +1333,14 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             Cf += weight*C[t]
         return Cf
 
-    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,MaxIt=1000,tolError=1e-6):
+    def nelder_mead_con(initial_simplex,func,Cf,lb,ub):
     # Nelder-Mead for constraint optimization
     # initial_simplex should be array of shape (N+1,N) with N: problem size
         alpha = 1
         beta = 0.5
         gamma = 2
         delta = 0.5
-        tol = 1e-8
+        tol = 1e-10        
 
         n = len(initial_simplex[0])
         xfC = []                    # list with [[x1,f(x1),Cf(x1)],[x2,f(x2),Cf(x2)],...
@@ -1359,7 +1363,7 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
         # sort xfC from low to high f(x) values
         xfC = sorted(xfC,key=lambda elem: elem[1])
 
-        while (it <= MaxIt and error > tolError):
+        while (it <= maxIt_NM and error > tol_NM):
             ## sort xfC from low to high f(x) values
             #xfC = sorted(xfC,key=lambda elem: elem[1]) # kann geloescht werden
             # Reflection:
@@ -1490,20 +1494,17 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
     n = len(x0)             # problem size
     bounds = unknown_options['bounds']
 
-    if (N==None):           # define swarm size
-        N = 21*n+1
-    if (vel_max==None):     # define maximal velocity (30% of feasible interval)
-        vel_max = numpy.empty(n)
-        for q in range(n):
-            vel_max[q] = 0.3 * (bounds.ub[q]-bounds.lb[q])
+    N = 21*n+1              # swarm size (number of particles)
+    
+    vel_max = numpy.empty(n)    # define maximal verlocity
+    for q in range(n):
+        vel_max[q] = 0.1 * (bounds.ub[q]-bounds.lb[q])
+    
     if (c0==None):          # define weight c0
         c0 = 0.5 + (random.random()/3)
 
-    bounds = unknown_options['bounds']
     # Generate a class for the particles:
     class particle:
-        #best_swarm = numpy.empty(n)
-        #best_swarm_f = 0
         def __init__(self,pos,vel):
             self.pos = pos
             self.pos_f = func(pos)
@@ -1546,7 +1547,7 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
                 if (self.pos_f < self.best_f):
                     self.best_f = self.pos_f
                     self.best = self.pos   
-            # reset particle (not NH neighborhood):
+        # reset particle (not NH neighborhood):
         def reset(self):
             self.pos = numpy.random.uniform(bounds.lb,bounds.ub)
             self.pos_f = func(self.pos)
@@ -1562,14 +1563,13 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
         vel0 = numpy.random.uniform(-vel_max,vel_max)       # random start velocity
         swarm.append(particle(pos0,vel0))
 
-    k = 0           # Iteration
+    k = 0                                                   # Iteration
     xBest = numpy.empty(n)
-    xBest_f = 1e16
-    stopCrit = 0            # counter for stopping criteria
+    xBest_f = 1e100
 
-    xarray = []
-    yarray = []
-    xBest_old = numpy.zeros(n)      # needed for check "Abstand ..." in first loop run
+    xBest_old = numpy.zeros(n)      
+    stopCtr = 0
+    stopList = []
 
     while (k <= maxiter):
         #Evaluate solutions and apply Repair Method if not in feasible region:
@@ -1586,7 +1586,8 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             # write tupel (i,f(i)) in liste:
             temp = [i,swarm[i].pos_f]
             liste.append(temp)
-        print("repaired particles = ", infeasible)
+        #print("repaired particles = ", infeasible)
+        
         # sort liste from low func values to high func values:
         liste = sorted(liste,key=lambda elem: elem[1])
         # Update xBest and xBest_f if solution is better:
@@ -1597,32 +1598,39 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             xBest_f = liste[0][1]
         
         print("bestes f = ", xBest_f)
-        print("Abstand zwischen alter und neuer Loesung: ", numpy.linalg.norm(xBest-xBest_old))
+        #print("Abstand zwischen alter und neuer Loesung: ", numpy.linalg.norm(xBest-xBest_old))
         xBest_old = xBest
 
-        stopCrit = stopCrit+1
-
+        if len(stopList) < stopNumber:
+            stopList.append(xBest_f)
+            STOP = False
+        if len(stopList) >= stopNumber:
+            if (abs(stopList[0]-stopList[-1]) < stopTol*stopList[0]):
+                STOP = True           
+            stopList = stopList[1:len(stopList)]
+        
         # check stopping criteria: ---------------------------------------------
-        if (k==maxiter):
+        if (k==maxiter or STOP):
             print("Merit Final nach PSO_NM = ", xBest_f)
             print("xBest nach PSO_NM = ", xBest)
             print("Norm Gradient nach PSO_NM = ", \
                 numpy.linalg.norm(grad(func,xBest,math.sqrt(numpy.finfo(float).eps))))
             
-            def jaco(x):
-                h = math.sqrt(numpy.finfo(float).eps)
-                return grad(func,x,h)
-
-            Res = minimize(func,xBest,args=(),method='TNC',jac=jaco, \
-                    bounds=bounds,options={"maxiter":500,"disp":True})
-            print("Merit nach lokaler Suche = ", Res.fun)
-            print("x nach lokaler Suche = ", Res.x)
-            print("Norm Gradient nach lokaler Suche = ", \
-                numpy.linalg.norm(grad(func,Res.x,math.sqrt(numpy.finfo(float).eps))))
-
-            if (Res.fun < xBest_f):
-                xBest_f = Res.fun
-                xBest = Res.x
+            if improve:
+                def jaco(x):                                #needed for scipy algos
+                    h = math.sqrt(numpy.finfo(float).eps)
+                    return grad(func,x,h)
+    
+                Res = minimize(func,xBest,args=(),method='TNC',jac=jaco, \
+                        bounds=bounds,options={"maxiter":500,"disp":True})
+                print("Merit nach lokaler Suche = ", Res.fun)
+                print("x nach lokaler Suche = ", Res.x)
+                print("Norm Gradient nach lokaler Suche = ", \
+                    numpy.linalg.norm(grad(func,Res.x,math.sqrt(numpy.finfo(float).eps))))
+    
+                if (Res.fun < xBest_f):
+                    xBest_f = Res.fun
+                    xBest = Res.x
 
             return OptimizeResult(fun=xBest_f, x=xBest, nit = k)
             break
@@ -1633,23 +1641,20 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             initial_simplex[i] = swarm[liste[i][0]].pos
         final_simplex = nelder_mead_con(initial_simplex,func,Cf,bounds.lb,bounds.ub)
         # Update (n+1)th particle:
-                                    #for i in range(n+1):
-                                    #    parti = liste[i][0]
-                                    #    swarm[parti].updatePos(final_simplex[i])
-                                    #    liste[i][1] = swarm[parti].pos_f
         parti = liste[n][0]
         swarm[parti].updatePos(final_simplex[0])
         liste[n][1] = swarm[parti].pos_f
 
         # Update liste:
         liste = sorted(liste,key=lambda elem: elem[1])
-        # Apply PSO to all N particles:
+        
+        # Apply PSO:
         #1.) Determine global best particle:
         gBest = liste[0][0]             # index of global best particle
         
         if (typ == 1):
-            #2.) Divide 20n paritcles in two neighborhoods with 10N particles and
-            #    determine best of these tows:
+            # Divide 20n paritcles in two neighborhoods with 10N particles and
+            # determine best of these twos:
             firstN = numpy.arange(n+1,10*n+n+1,dtype=int)
             secondN = numpy.arange(10*n+n+1,20*n+n+1,dtype=int)
             random.shuffle(firstN)          # random shuffeling
