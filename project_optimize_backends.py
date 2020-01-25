@@ -13,7 +13,8 @@ from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
 from derivatives import grad, grad_pen, grad_lag, grad_log, hessian
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
-                                termcondition, plot2d, plot3d
+                                termcondition, plot2d, plot3d,\
+                                line_search_bound
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=2.0,
@@ -1286,7 +1287,7 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-5,\
 
 
 def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
-                 c0=None,c1=2.0,c2=2.0,typ=3,S=15,**unknown_options):
+                 c0=None,c1=2.0,c2=2.0,typ=1,S=25,**unknown_options):
     # Typ 1: Updating with global best and best of 2-neighborhood
     # Typ 2: Updating with global best and individual best since start
     # Typ 4: same as typ 1 but in PSO all particles are updated
@@ -1328,7 +1329,7 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             Cf += weight*C[t]
         return Cf
 
-    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,MaxIt=100,tolError=1e-6):
+    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,MaxIt=1000,tolError=1e-6):
     # Nelder-Mead for constraint optimization
     # initial_simplex should be array of shape (N+1,N) with N: problem size
         alpha = 1
@@ -1494,7 +1495,7 @@ def PSO_NM_1(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
     if (vel_max==None):     # define maximal velocity (30% of feasible interval)
         vel_max = numpy.empty(n)
         for q in range(n):
-            vel_max[q] = 0.1 * (bounds.ub[q]-bounds.lb[q])
+            vel_max[q] = 0.3 * (bounds.ub[q]-bounds.lb[q])
     if (c0==None):          # define weight c0
         c0 = 0.5 + (random.random()/3)
 
@@ -1820,8 +1821,10 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
 
 
-def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
+def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=3,typ=2,**unknown_options):
     # algorithm based on population based incremental learning
+    # typ 1: Gradient is the approximative gradient
+    # typ 2: Gradient is numerical computet
     # Np = population size; Ng = number of generations; 
     # m = subintervalls between lower bound and upper bound
     #---------------------------------------------------------------------------
@@ -1832,36 +1835,40 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
         b = numpy.empty(Q)
         xbest = swarm[0].pos
         fbest = swarm[0].f
-
-
-        for i in range(Q):
-            for j in range(n):
-                xi = swarm[i+1].pos
-                A[i,j] = xbest[j] - xi[j]
-            fi = swarm[i+1].f
-            b[i] = fbest - fi
-
-        grad = numpy.linalg.pinv(A).dot(b)
-        s = -grad
+        
+        if typ == 1:                # approximative gradient
+            for i in range(Q):
+                for j in range(n):
+                    xi = swarm[i+1].pos
+                    A[i,j] = xbest[j] - xi[j]
+                fi = swarm[i+1].f
+                b[i] = fbest - fi
+    
+            gradient = numpy.linalg.pinv(A).dot(b)
+            s = -gradient
+            #print("gradient = ", s)
+        else:                       # numerical gradient    
+            h = math.sqrt(numpy.finfo(float).eps)
+            s = -grad(func,xbest,h)
 
         NewPart = []        # list for new particle objects
 
         check = 0
-        beta1 = random.uniform(1e-6,1e-4)
-        Pos = xbest + beta1*s
+        beta1 = random.uniform(0,1)     # start value for line-search
+        Pos = line_search_bound(func,beta1,xbest,s,bounds)
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
         else:
             check = 1
-        beta2 = random.uniform(1e-6,1e-4)
-        Pos = xbest + beta2*s
+        beta2 = random.uniform(0,1)     # start value for line-search
+        Pos = line_search_bound(func,beta2,xbest,s,bounds)
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
         else:
             check = 1
 
         if (check > 0):             # if one of the first two points isn't in feasible region -> stop
-            print("nicht in feasible region")
+            #print("nicht in feasible region")
             return NewPart
         else:
             # solve LGS T*u=w
@@ -1874,8 +1881,11 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
             # determine z3:
             beta3 = -u[1]/2/u[0]
             Pos = xbest + beta3*s
-            NewPart.append(particle(Pos))
-    
+            if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
+                NewPart.append(particle(Pos))
+            else:
+                #print("Z3 nicht in feasible region")
+                pass
             return NewPart
 
     def EDR(X,t,Ng):          # Evolutionary Direction Recombination
@@ -1919,7 +1929,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
     tolError = 1e-3
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
-    Np = 255            # population size
+    Np = 200            # population size
     #xbest = x0
     #fbest = func(xbest)
     xbest = numpy.empty(n)
@@ -2022,6 +2032,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
             print("Verbesserung durch EDO")
 
         print("fbest = ", fbest)
+
         
         # find out in which interval xbest is:
         r = numpy.empty(n)          # safes the interval number j of xbest[i]
@@ -2032,7 +2043,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
                     r[i] = j
                     break
         
-        print("Abstand Intervall xBest_alt zu xBest_neu = ",numpy.linalg.norm(r-r_alt))
+        #print("Abstand Intervall xBest_alt zu xBest_neu = ",numpy.linalg.norm(r-r_alt))
         r_alt = r
         #print("P alt = ", P)
         #print("r = ", r)
@@ -2057,7 +2068,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=8,Q=16,**unknown_options):
         PBestInt = 0
         for i in range(n):
             PBestInt += P[i,int(r[i])]
-        print("Summe P_best = ", PBestInt)
+        #print("Summe P_best = ", PBestInt)
                 
 
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)

@@ -52,8 +52,10 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        gradient_descent,
                                        #PSO_standard,
                                        #PSO_constraint,
-                                       PSO_NM,
+                                       PSO_NM_1,
                                        Nelder_Mead_Constraint,
+                                       PopBasIncLearning,
+                                       PopBasIncLearning_hyb,
                                        sgd)
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
@@ -120,17 +122,17 @@ osa = OpticalSystemAnalysis(s, sysseq)
 # III ----------- defining raybundles for optimization and plotting 
 rays_dict=fi1.get_rays_dict()
 #TODO In Landos code noch wavelength and numrays einpflegen
-wavelength = [0.5875618e-3, 0.4861327e-3]#, 0.6562725e-3]
-numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
-                                    numrays, wavelength, 
+                                    fi1.numrays, fi1.wavelengths, 
                                     whichmeritfunc='standard', 
-                                    error='error2',sample_param='bundle')
+                                    error='error2',
+                                    penalty=True)
 
 
 # ----- plot the original system
 # --- set the plot setting
+
 pn = np.array([1, 0, 0])
 up = np.array([0, 1, 0])
 
@@ -164,12 +166,8 @@ def osupdate(my_s):
     my_s.rootcoordinatesystem.update()
 
 
-# ----- choose the backend
 
-# opt_backend = ScipyBackend(method='Nelder-Mead',
-#                            options={'maxiter': 1000, 'disp': True}, tol=1e-8)
-
-
+"""
 # BENCHMARKING:
 methods = [ #["Nelder-Mead","penalty"],\
             #[test_minimize_neldermead,"penalty"], \
@@ -182,19 +180,21 @@ methods = [ #["Nelder-Mead","penalty"],\
             #[PSO_standard,"penalty"],\
             #[PSO_constraint,"standard"],\
             #[PSO_NM,"standard"],\
-            [Nelder_Mead_Constraint,"standard"]
+            #[Nelder_Mead_Constraint,"standard"],\
+            [PopBasIncLearning,"standard"]
             ]
 
 benchmark(s,meritfunctionrms,osupdate,methods)
 """
+
 #*******************************************************************************
 #****ALS FUNKTION AUSLAGERN???**************************************************
 #*******************************************************************************
 # choose our own backend for testing some algos
-opt_backend = ProjectScipyBackend(optimize_func=test_minimize_neldermead,
-                                  methodparam=2,
-                                  options={'maxiter': 100, 'xatol': 1e-5,\
-                                           'fatol': 1e-5})
+opt_backend = ProjectScipyBackend(optimize_func=PopBasIncLearning_hyb,
+                                  methodparam="standard",
+                                  options={'maxiter': 50, 'xatol': 1e-5,\
+                                           'fatol': 1e-5,'Ng':50})
 
 # ----- create optimizer object
 optimi = Optimizer(s,
@@ -238,4 +238,10 @@ plotBundles(s, testbundle, sysseq, ax2, pn, up)
 ls=listOptimizableVariables(s, filter_status='variable', max_line_width=1000)
 
 plt.show()
-"""
+
+print("ergebnisse: ")
+print("time = ",ende-start)
+print("meritFinal = ",opt_backend.res.fun)
+print("fEval = ",optimi.NoC)
+print("it = ",opt_backend.res.nit)
+print("xfinal = ", opt_backend.res.x)
