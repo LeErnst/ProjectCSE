@@ -764,3 +764,221 @@ def plot3d(X, Y, Z,
         plt.show()
 
 
+def resettingAlgo(func, gradf, x_k, p_k, alpha, 
+                  roh=0.9, c=1e-2, maxiter=50, **kwargs):
+    '''
+    This algorithm reduces the initial stepsize alpha until Armijos condition
+    is satisfied. It is also known as backtracking algorithm.
+    func   : C1 function
+    gradf  : derivative of func
+    x_k    : current position
+    p_k    : descent direction
+    alpha  : (possibly large) initial stepsize 
+    roh    : reduction factor \in (0,1)
+    c      : parameter \in (0,1) to reduce the slope at x_k in direction p_k
+    maxiter: maximum number of iterations
+    '''
+    alpha_k = alpha
+    iternum = 1
+    while (func(x_k+alpha_k*p_k) > func(x_k) + c*alpha_k*np.dot(gradf(x_k),p_k)):
+        alpha_k *= roh
+        # debugging
+        print(iternum)
+        if (iternum > maxiter):
+            print('\nmaxiter is reached, resettingAlgo has failed\n')
+            break
+        iternum += 1
+
+    return alpha_k
+
+
+def armijo(func, gradf, x_k, p_k, 
+           alpha, 
+           delta_min=1e-3, delta_max=1e-1, 
+           c=1e-1, 
+           maxiter=20, 
+           **kwargs):
+    '''
+    This algorithm reduces the initial stepsize alpha until Armijos condition
+    is satisfied. It is also known as backtracking algorithm.
+    func     : C1 function
+    gradf    : derivative of func
+    x_k      : current position
+    p_k      : descent direction
+    alpha    : (possibly large) initial stepsize 
+    delta_min: parameter for stepsize difference
+    delta_max: parameter for stepsize difference
+    c        : parameter \in (0,1) to reduce the slope at x_k in direction p_k
+    maxiter  : maximum number of iterations for cubic interpolation
+    '''
+    phi_0     = func(x_k)
+    phi_a0    = func(x_k + alpha*p_k)
+    gradphi_0 = np.dot(gradf(x_k),p_k)
+
+    if (phi_a0 <= phi_0 + c*alpha*gradphi_0): # check armijo
+        return alpha
+    else: # quadratic interpolation
+        alpha_1 = -(phi_0*alpha*alpha)/(2*(phi_a0-phi_0-gradphi_0*alpha))
+        phi_a1  = func(x_k+alpha_1*p_k)
+
+    if ((alpha - alpha_1 < delta_min) or \
+        (alpha - alpha_1 > delta_max)): # check stepsize difference
+
+        alpha_1 = alpha/2 
+
+    if (phi_a1 <= phi_0 + c*alpha_1*gradphi_0): # check armijo
+        return alpha_1
+    else: # cubic interpolation
+        alphaj   = alpha_1
+        alphaj_1 = alpha
+        phij     = func(x_k + alphaj  *p_k)
+        phij_1   = func(x_k + alphaj_1*p_k)
+        iternum  = 1
+        while (1):
+            gammaj   = 1/(((alphaj_1*alphaj)**2)*(alphaj-alphaj_1))
+            aj       = gammaj*(+(alphaj_1**2)*(phij  -phi_0-gradphi_0*alphaj  )\
+                               -(alphaj  **2)*(phij_1-phi_0-gradphi_0*alphaj_1))
+            bj       = gammaj*(-(alphaj_1**3)*(phij  -phi_0-gradphi_0*alphaj  )\
+                               +(alphaj  **3)*(phij_1-phi_0-gradphi_0*alphaj_1))
+            alphaj_1 = alphaj
+            alphaj   = (-bj+math.sqrt((bj**2)-3*aj*gradphi_0))/(3*aj)
+            phij     = func(x_k + alphaj*p_k)
+            
+            if ((alphaj_1 - alphaj < delta_min) or \
+                (alphaj_1 - alphaj > delta_max)): # check stepsize difference
+
+                alphaj = alphaj_1/2
+            
+            if (phij <= phi_0 + c*alphaj*gradphi_0): # check armijo
+                return alphaj
+            
+            print(iternum)
+            if (iternum > maxiter):
+                print('\nmaxiter is reached, cubic interpolation has failed\n')
+                break
+
+            iternum += 1
+            
+
+def interpol_hermite(alpha1, alpha2,
+                     phi1, phi2,
+                     gradphi1, gradphi2):
+    '''
+    This function interpolates a function phi with a cubic interpolation poly.
+    using derivatives (Hermite interpolation).
+    alpha1  : first point
+    alpha2  : second point
+    phi1    : phi(alpha1)
+    phi2    : phi(alpha2)
+    gradphi1: grad(phi)(alpha1)
+    gradphi2: grad(phi)(alpha2)
+    '''
+    d1 = gradphi1+gradphi2-3*(phi1-phi2)/(alpha1-alpha2)
+    d2 = math.copysign(1, alpha2-alpha1)*np.sqrt(d1*d1-gradphi1*gradphi2)
+    alpha = alpha2-(alpha2-alpha1)*(gradphi2+d2-d1)/(gradphi2-gradphi1+2*d2)
+    return alpha
+
+
+
+def interpolation(func, gradf, x_k, p_k,
+                  alpha1, alpha2, 
+                  c1, c2,
+                  **kwargs):
+    '''
+    Function for the interpolation step in strong wolfe algorithm below.
+    func   : C1 function
+    gradf  : derivative of func
+    x_k    : current position
+    p_k    : descent direction
+    alpha1 : first stepsize 
+    alpha2 : second stepsize 
+    c1     : parameter \in (0,1) to reduce the slope at x_k in direction p_k
+    c2     : parameter \in (c1,1) for the curvature condition
+    maxiter: maximum number of iterations for cubic interpolation
+    '''
+    phi0     = func(x_k)
+    phi1     = func(x_k+alpha1*p_k)
+    phi2     = func(x_k+alpha2*p_k)
+    gradphi0 = np.dot(gradf(x_k),p_k)
+    gradphi1 = np.dot(gradf(x_k+alpha1*p_k),p_k)
+    gradphi2 = np.dot(gradf(x_k+alpha2*p_k),p_k)
+
+    while(1):
+        # interpolation or ...
+        alphai = interpol_hermite(alpha1, alpha2, phi1, phi2, gradphi1, gradphi2) 
+        # ... bisection
+        # alphai = (alpha1+alpha2)/2
+        phi_ai = func(x_k+alphai*p_k)
+        # check armijo and whether the function value at alphai is \ge the one 
+        # at alpha_1 (which is alpha_low)
+        if ((phi_ai > phi0+c1*alphai*gradphi0) or (phi_ai >= phi1)):
+            alpha2 = alphai
+        else:
+            gradphi_ai = np.dot(gradf(x_k+alphai*p_k),p_k)
+            # check strong curvature
+            if (np.absolute(gradphi_ai) <= -c2*gradphi0):
+                return alphai
+            # check property of alpha1 and alpha2 
+            if (gradphi_ai*(alpha2-alpha1) >= 0):
+                alpha2 = alpha1
+
+            alpha1 = alphai
+
+
+def strongwolfe(func, gradf, x_k, p_k, 
+                alpha1, alpha_max, 
+                c1, c2, 
+                maxiter, 
+                **kwargs):
+    '''
+    This algorithm searches for a step size which fulfills the strong wolfe 
+    condtion.
+    func      : C1 function
+    gradf     : derivative of func
+    x_k       : current position
+    p_k       : descent direction
+    alpha1    : initial stepsize 
+    alpha_max : maximal stepsize 
+    c1        : parameter \in (0,1) to reduce the slope at x_k in direction p_k
+    c2        : parameter \in (c1,1) for the curvature condition
+    maxiter   : maximum number of iterations for cubic interpolation
+    '''
+
+    alpha0   = 0
+    alphaj_1 = alpha0
+    alphaj   = alpha1
+    phi0     = func(x_k)
+    phij_1   = phi0
+    gradphi0 = np.dot(gradf(x_k),p_k)
+    j        = 1
+    while (1):
+        phij = func(x_k+alphaj*p_k)
+
+        # check armijo and whether the next function value is greater
+        if ((phij > phi0+c1*alphaj*gradphi0) or ((j > 1) and (phij >= phij_1))):
+            alpha = interpolation(func, gradf, x_k, p_k, alphaj_1, alphaj, c1, c2)
+            return alpha
+        
+        gradphij = np.dot(gradf(x_k+alphaj*p_k), p_k)
+
+        # check strong curvature (the slope has to decrease)
+        if (np.absolute(gradphij) <= -c2*gradphi0):
+            return alphaj
+        # check whether the next slope is greater or equal zero
+        if (gradphij >= 0):
+            alpha = interpolation(func, gradf, x_k, p_k, alphaj, alphaj_1, c1, c2)
+            return alpha
+
+        # choose the next step size
+        alphaj_1 = alphaj
+        alphaj   = 2*alphaj_1
+        phij_1   = phij
+
+        print(j)
+        if (j > maxiter):
+            print('\nmaxiter is reached, strong wolfe algorithm has failed\n')
+            break
+        j += 1
+
+
+

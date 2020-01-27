@@ -84,11 +84,11 @@ from derivatives import get_stochastic_grad
 var_list = [[False, 0, 'image plane decz', None],
             [False, 3, 'surf plane decz', None],
             [False, 7, 'surf plane decz', None],
-            [False, 9, 'surf8 curvature', np.array([0.03, 0.05])],
-            [False, 13, 'surf curvature', np.array([-0.2, 0.2])],
+            [False, 9, 'surf3 curvature', np.array([-0.05, 0.05])],
+            [False, 10, 'surf4 number of rays', np.array([-0.0380, -0.0360])],
             [False, 16, 'surf curvature', np.array([-0.2, 0.2])]]
 
-for (logy, plotvar, legend, interval) in [var_list[3]]:
+for (logy, plotvar, legend, interval) in [var_list[4]]:
     #####################################NeuAnfang##################################
     #create inout object for all io stuff
     fi1=inout()
@@ -181,13 +181,13 @@ for (logy, plotvar, legend, interval) in [var_list[3]]:
     # possible methodparams = {standard, penalty, penalty-lagrange, log}
     
     plotsettings = {'fig'       : plotvar,
-                    'title'     : r'$p_{i}$-meritfunction-plot',
-                    'xlabel'    : r'$p_{i}$',
-                    'ylabel'    : 'meritfunctionvalue',
+                    'title'     : 'curvature-number of rays-plot',
+                    'xlabel'    : 'curvature',
+                    'ylabel'    : 'number of rays',
                     'legend'    : legend,
                     'ylog'      : logy,
                     'linestyle' : '-o', 
-                    'linewidth' : 0.5,
+                    'linewidth' : 1,
                     'markersize': 1,
                     'save'      : False,
                     'name'      : '',

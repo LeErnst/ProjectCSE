@@ -13,7 +13,8 @@ from pyrateoptics.core.log import BaseLogger
 from pyrateoptics.optimize.optimize_backends import Backend
 from derivatives import grad, grad_pen, grad_lag, grad_log, hessian
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
-                                termcondition, plot2d, plot3d
+                                termcondition, plot2d, plot3d, armijo,\
+                                resettingAlgo, strongwolfe
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=2.0,
@@ -397,6 +398,7 @@ def sgd(func, x0, args,
     fk_1       = func(x0)
     path       = numpy.empty(maxiter+1)
     path[0]    = fk_1
+    stepsize_k = stepsize
 
     # momentum vector
     vk_1 = numpy.zeros(len(x0))
@@ -408,7 +410,10 @@ def sgd(func, x0, args,
         # choose the method
         if (methods == 'vanilla'):
             # vanilla sgd
-            vk   = stepsize*stochagrad(xk_1)
+            stochagrd_k = stochagrad(xk_1)
+            stepsize_k = armijo(func, gradient, xk_1, -stochagrd_k, 
+                                     stepsize, 1e-3, 1e-1, 4e-1)
+            vk   = stepsize_k*stochagrd_k
         if (methods == 'momentum'):
             # momentum vector
             vk   = gamma*vk_1+stepsize*stochagrad(xk_1)
@@ -916,15 +921,102 @@ def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
 
 
 def gradient_descent(func, x0, args=(),
-                     maxiter=100, stepsize=1e-8, **kwargs):
+                     maxiter=100, 
+                     stepsize=1e-9, 
+                     stepsize_max=1e-5, 
+                     roh=0.1,
+                     c1=1e-4,
+                     c2=0.9,
+                     delta_min=1e-3,
+                     delta_max=1e-1,
+                     gradtol=500,
+                     **kwargs):
     xk = x0
     grad = kwargs['grad']
     iternum = 0 
+    stepsize_k = stepsize
 
     while (iternum < maxiter):
         iternum += 1
-        xk -= stepsize*grad(xk)
-        if (numpy.linalg.norm(grad(xk), numpy.inf) <= 500):
+        # determine stepsize
+        gk_1 = grad(xk)
+        stepsize_k = strongwolfe(func, grad, xk, -grad(xk), 
+                                 stepsize_k, stepsize_max,
+                                 c1, c2, 50)
+        xk -= stepsize_k*grad(xk)
+        
+        gk = grad(xk)
+        #stepsize_k *= (numpy.dot(gk_1,-gk_1)/numpy.dot(gk,-gk))
+
+        # debugging
+        fk = func(xk)
+        gknorm = numpy.linalg.norm(gk, numpy.inf)
+        print('gknorm = %7.4f' %(gknorm))
+        print('fk     = %7.4f' %(fk))
+
+        # termination condition
+        if (numpy.linalg.norm(grad(xk), numpy.inf) <= gradtol):
+            print('\ngradient is near zero\n')
+            print('||grad(x_final)||_inf = %10.6'\
+                  % (numpy.linalg.norm(grad(xk), numpy.inf)))
+            print('\nTerminated in iteration: %d' % (iternum))
+            break
+
+    printArray('gradient in gradient decsent for x_final = ', grad(xk))
+
+    return OptimizeResult(fun=func(xk), x=xk, nit=iternum)
+
+
+def gd_splitted_stepsize(func, x0, args=(),
+                         maxiter=100, 
+                         stepsize1=5e-1, 
+                         stepsize2=1e-9, 
+                         stepsize_max=1e+2, 
+                         roh=0.1,
+                         c1=1e-4,
+                         c2=0.9,
+                         delta_min=1e-3,
+                         delta_max=1e-1,
+                         gradtol=500,
+                         **kwargs):
+    xk = x0
+    grad = kwargs['grad']
+    iternum = 0 
+    stepsize1_k = stepsize1
+    stepsize2_k = stepsize2
+
+    while (iternum < maxiter):
+        iternum += 1
+        # determine stepsize
+        gk_1 = grad(xk)
+        func1 = lambda x: func(numpy.append(x, xk[9:17:1]))
+        func2 = lambda x: func(numpy.append(xk[0:9:1], x))
+        grad1 = lambda x: grad(numpy.append(x, xk[9:17:1]))[0:9:1]
+        grad2 = lambda x: grad(numpy.append(xk[0:9:1], x))[9:17:1]
+
+        stepsize1_k = strongwolfe(func1, grad1, xk[0:9:1], -grad1(xk[0:9:1]), 
+                                 stepsize1_k, stepsize_max,
+                                 c1, c2, 50)
+        stepsize2_k = strongwolfe(func2, grad2, xk[9:17:1], -grad2(xk[9:17:1]), 
+                                 stepsize2_k, stepsize_max,
+                                 c1, c2, 50)
+        xk[0:9:1] -= stepsize1_k*gk_1[0:9:1]
+        xk[9:17:1] -= stepsize2_k*gk_1[9:17:1]
+        printArray('xk =', xk) 
+        print(stepsize1_k)
+        print(stepsize2_k)
+#        printArray('gk =', gk_1) 
+        gk = grad(xk)
+        #stepsize_k *= (numpy.dot(gk_1,-gk_1)/numpy.dot(gk,-gk))
+
+        # debugging
+        fk = func(xk)
+        gknorm = numpy.linalg.norm(gk, numpy.inf)
+        print('gknorm = %7.4f' %(gknorm))
+        print('fk     = %7.4f' %(fk))
+
+        # termination condition
+        if (numpy.linalg.norm(grad(xk), numpy.inf) <= gradtol):
             print('\ngradient is near zero\n')
             print('||grad(x_final)||_inf = %10.6'\
                   % (numpy.linalg.norm(grad(xk), numpy.inf)))

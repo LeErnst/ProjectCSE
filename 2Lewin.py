@@ -55,7 +55,8 @@ from project_optimize_backends import (ProjectScipyBackend,
                                        adagrad,
                                        adadelta,
                                        get_scipy_stochastic_hybrid,
-                                       plot2d_meritfunction)
+                                       plot2d_meritfunction,
+                                       gd_splitted_stepsize)
 
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
@@ -126,7 +127,7 @@ rays_dict = fi1.get_rays_dict()
 
 wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
 numrays = 20
-sample_param = 'wave'
+sample_param = 'bundle'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                                      numrays, wavelength, 
@@ -202,19 +203,22 @@ plotsettings = {'fig'      : 1,
 # TODO: change the gradtol such that the stocha method and langrange/penalty 
 #       have the same termination condition
 # TODO: generalize the methods to plot more than one curve
-options_s1 = {'gtol'    : 1e+8,
-              'maxiter' : 100, 
-              'stepsize': 1e-7, 
-              'beta1'   : 0.1, 
-              'beta2'   : 0.99,
-              'gradtol' : 500,
-              'roh'     : 0.999,
-              'epsilon' : 1e-8,
-              'gamma'   : 0.1,
-              'methods' : 'nag',
-              'pathf'   : True,
-              'plot'    : False,
-              'plotset' : plotsettings}
+options_s1 = {'gtol'     : 1e+8,
+              'maxiter'  : 150, 
+              'stepsize' : 1e-7, 
+              'beta1'    : 0.1, 
+              'beta2'    : 0.99,
+              'gradtol'  : 500,
+              'roh'      : 0.1,
+              'c'        : 1e-2,
+              'delta_min': 1e-1,
+              'delta_max': 1e+6,
+              'epsilon'  : 1e-8,
+              'gamma'    : 0.1,
+              'methods'  : 'vanilla',
+              'pathf'    : True,
+              'plot'     : False,
+              'plotset'  : plotsettings}
 
 # options for deterministic optimization method
 options_d = {'maxiter': 150, 
@@ -232,7 +236,7 @@ options_d = {'maxiter': 150,
 #         'options_s': options_s}
 
 # ---- stochastic gradient descent
-opt_backend_1 = ProjectScipyBackend(optimize_func=sgd,
+opt_backend_1 = ProjectScipyBackend(optimize_func=gd_splitted_stepsize,
                                     methodparam='penalty-lagrange',
                                     stochagradparam=True,
                                     options=options_s1)
