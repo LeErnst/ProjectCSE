@@ -763,6 +763,25 @@ def plot3d(X, Y, Z,
     if (show==True):
         plt.show()
 
+def line_search_bound(func,beta0,x,d,bounds):
+    beta = beta0
+    f_alt = func(x)
+    x_neu = x + beta*d
+    while not (np.all(x_neu>=bounds.lb) and np.all(x_neu<=bounds.ub)):
+        beta = beta * 0.8
+        if beta < 1e-9:
+            print("beta zu klein")
+            return
+        x_neu = x + beta*d
+    while not (func(x_neu) < f_alt):
+        beta = beta * 0.8
+        if beta < 1e-9:
+            print("beta zu klein 2")
+            return
+        x_neu = x + beta*d
+    
+    return x_neu
+
 
 def resettingAlgo(func, gradf, x_k, p_k, alpha, 
                   roh=0.9, c=1e-2, maxiter=50, **kwargs):

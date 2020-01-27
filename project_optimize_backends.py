@@ -14,7 +14,7 @@ from pyrateoptics.optimize.optimize_backends import Backend
 from derivatives import grad, grad_pen, grad_lag, grad_log, hessian
 from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
                                 termcondition, plot2d, plot3d, armijo,\
-                                resettingAlgo, strongwolfe
+                                resettingAlgo, strongwolfe, line_search_bound
 
 class ProjectScipyBackend(Backend):
     def __init__(self, optimize_func, methodparam=None, tau0=2.0,
@@ -1198,7 +1198,7 @@ def test_minimize_neldermead(func, x0, args=(),
                           final_simplex=(sim, fsim))
 
 
-def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
+def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-5,\
                             **unknown_options):
     #---------------------------------------------------------------------------
     def Cf(x,lb,ub):                        # Constraint fitness priority-based ranking method
@@ -1377,25 +1377,33 @@ def Nelder_Mead_Constraint(func,x0,args=(),maxiter=100,tol=1e-8,\
                             final_simplex=final_simplex)
 
 
-def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
-                 c0=None,c1=1.0,c2=2.0,**unknown_options):
-    # N = population size (has to be: N >= 2n+1; with n=problem size)
-    # vel_max = maximal velocity of a particle
+def PSO_NM_1(func,x0,args=(),maxiter=100,c0=None,c1=2.0,c2=2.0,\
+             typ=1,S=25,\
+             maxIt_NM=100,tol_NM=1e-6,\
+             improve=True,\
+             stopNumber=10, stopTol=0.1,**unknown_options):
+    # Typ 1: Updating with global best and best of 2-neighborhood
+    # Typ 2: Updating with global best and individual best since start
+    # Typ 3: Population is divided in S Subpopulations
+    # Typ 4: same as typ 1 but in PSO all particles are updated
     # c0,c1 and c2 are variables for updating the velocity of the particles
-
-    #rm is a method which brings a solution x in a infeasible region ...
-    #to a feasible region
+    # S: number of neighborhoods/subpopulations
+    # MaxIt_NM: max number of iterations for Nelder-Mead
+    # tol_NM: stopping criteria for Nelder-Mead (tolerance)
+    # improve: if true, "TNC" is applied to best find solution to improve solution
+    # if fBest doesn't decrease about (stopTol*100)% in stopNumber iterations -> stop
+    
+    # subfunctions needed:
     #---------------------------------------------------------------------------
     def rm(x,lb,ub,vel_max):                      # repair method (later grad.bas.r.m)
-        # moves positions on bounds if they don't be in the feasible region
-        # ACHTUNG: angepasst mit vel_max
+        # moves particles on bounds if they don't be in the feasible region
         from copy import deepcopy
         x_neu = deepcopy(x)
         for t in range(len(x)):
             if (x[t]<lb[t]):
-                x_neu[t] = lb[t] #+ 2*vel_max[t]
+                x_neu[t] = lb[t] 
             if (x[t]>ub[t]):
-                x_neu[t] = ub[t] #- 2*vel_max[t]
+                x_neu[t] = ub[t] 
         return x_neu
 
     def Cf(x,lb,ub):                        # Constraint fitness priority-based ranking method
@@ -1416,14 +1424,14 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             Cf += weight*C[t]
         return Cf
 
-    def nelder_mead_con(initial_simplex,func,Cf,lb,ub,MaxIt=100,tolError=1e-4):
+    def nelder_mead_con(initial_simplex,func,Cf,lb,ub):
     # Nelder-Mead for constraint optimization
     # initial_simplex should be array of shape (N+1,N) with N: problem size
         alpha = 1
         beta = 0.5
         gamma = 2
         delta = 0.5
-        tol = 1e-8
+        tol = 1e-10        
 
         n = len(initial_simplex[0])
         xfC = []                    # list with [[x1,f(x1),Cf(x1)],[x2,f(x2),Cf(x2)],...
@@ -1442,9 +1450,13 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
         error *= 1/(float(n)+1)
 
         it = 1
-        while (it <= MaxIt and error > tolError):
-            # sort xfC from low to high f(x) values
-            xfC = sorted(xfC,key=lambda elem: elem[1])
+
+        # sort xfC from low to high f(x) values
+        xfC = sorted(xfC,key=lambda elem: elem[1])
+
+        while (it <= maxIt_NM and error > tol_NM):
+            ## sort xfC from low to high f(x) values
+            #xfC = sorted(xfC,key=lambda elem: elem[1]) # kann geloescht werden
             # Reflection:
             # Determine x_cent without x_high:
             x_cent = numpy.zeros(n)
@@ -1560,6 +1572,9 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
                 error += (xfC[t][1]-f_mean)**2
             error *= 1/(float(n)+1)   
 
+            # sort xfC from low to high f(x) values
+            xfC = sorted(xfC,key=lambda elem: elem[1])
+
         final_simplex = numpy.empty([n+1,n])
         for t in range(n+1):
             final_simplex[t] = xfC[t][0]
@@ -1570,35 +1585,46 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
     n = len(x0)             # problem size
     bounds = unknown_options['bounds']
 
-    if (N==None):           # define swarm size
-        N = 21*n+1
-    if (vel_max==None):     # define maximal velocity (30% of feasible interval)
-        vel_max = numpy.empty(n)
-        for q in range(n):
-            vel_max[q] = 0.1 * (bounds.ub[q]-bounds.lb[q])
+    N = 21*n+1              # swarm size (number of particles)
+    
+    vel_max = numpy.empty(n)    # define maximal verlocity
+    for q in range(n):
+        vel_max[q] = 0.1 * (bounds.ub[q]-bounds.lb[q])
+    
     if (c0==None):          # define weight c0
         c0 = 0.5 + (random.random()/3)
 
-    bounds = unknown_options['bounds']
     # Generate a class for the particles:
     class particle:
-        #best_swarm = numpy.empty(n)
-        #best_swarm_f = 0
         def __init__(self,pos,vel):
             self.pos = pos
             self.pos_f = func(pos)
-            #self.best_part = pos        # best position of this particle
-            #self.best_part_f = self.pos_f
             self.vel = vel
+            self.best = self.pos
+            self.best_f = self.pos_f
+            self.NH = random.randint(0,S-1)     # specifies to which neighborhood particle participate
         def updatePos(self,pos):
             self.pos = pos
             self.pos_f = func(self.pos)
-            #self.checkBestPart
-        def update(self,c0,c1,c2,gBest,nBest):  # gBest:global best; nBest:neighborhood best
+            if(numpy.all(self.pos>=bounds.lb) and numpy.all(self.pos<=bounds.ub)):
+                if (self.pos_f < self.best_f):
+                    self.best_f = self.pos_f
+                    self.best = self.pos
+        def update(self,c0,c1,c2,gBest,nBest=numpy.empty(n)):  # gBest:global best; nBest:neighborhood best
             r1 = random.random()       # random number between 0 and 1
             r2 = random.random()
-            self.vel = c0*self.vel + c1*r1*(nBest-self.pos) + \
-                        c2*r2*(gBest-self.pos)
+            if (typ == 1):
+                self.vel = c0*self.vel + c1*r1*(nBest-self.pos) + \
+                            c2*r2*(gBest-self.pos)
+            elif (typ == 2):
+                self.vel = c0*self.vel + c1*r1*(self.best-self.pos) + \
+                            c2*r2*(gBest-self.pos)
+            elif (typ == 3):
+                self.vel = c0*self.vel + c1*r1*(self.best-self.pos) + \
+                            c2*r2*(gBest-self.pos)  #gBest is neighborhood best
+            if (typ == 4):
+                self.vel = c0*self.vel + c1*r1*(nBest-self.pos) + \
+                            c2*r2*(gBest-self.pos)           
             #check if self.vel is out of [-vel_max,vel_max]:
             for q in range(n):
                 if (self.vel[q] < -vel_max[q]):
@@ -1608,27 +1634,33 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             # Update position
             self.pos = self.pos + self.vel
             self.pos_f = func(self.pos)
-            #self.checkBestPart
-        #def checkBestPart():            # checks if actual pos. ist better than best_part
-        #    if (self.pos_f <= self.best_part_f):
-        #        self.best_part = self.pos
-        #        self.best_part_f = func(self.pos)
+            if(numpy.all(self.pos>=bounds.lb) and numpy.all(self.pos<=bounds.ub)):
+                if (self.pos_f < self.best_f):
+                    self.best_f = self.pos_f
+                    self.best = self.pos   
+        # reset particle (not NH neighborhood):
+        def reset(self):
+            self.pos = numpy.random.uniform(bounds.lb,bounds.ub)
+            self.pos_f = func(self.pos)
+            self.vel = numpy.random.uniform(-vel_max,vel_max)
+            self.best = self.pos
+            self.best_f = self.pos_f
     
     # Initialization of all particles with Position and velocity:
     swarm = []
-    pos0 = x0                           # initial x0 ist part of swarm
-    vel0 = random.random() * vel_max
-    swarm.append(particle(pos0,vel0))
 
-    for i in range(N-1):
+    for i in range(N):
         pos0 = numpy.random.uniform(bounds.lb,bounds.ub)    # start position in feasible region
-        vel0 = random.random() * vel_max                    # random start velocity
+        vel0 = numpy.random.uniform(-vel_max,vel_max)       # random start velocity
         swarm.append(particle(pos0,vel0))
 
-    k = 0           # Iteration
-    xBest = x0
-    xBest_f = func(x0)
-    stopCrit = 0            # counter for stopping criteria
+    k = 0                                                   # Iteration
+    xBest = numpy.empty(n)
+    xBest_f = float('INF')
+
+    xBest_old = numpy.zeros(n)      
+    stopCtr = 0
+    stopList = []
 
     while (k <= maxiter):
         #Evaluate solutions and apply Repair Method if not in feasible region:
@@ -1645,60 +1677,131 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
             # write tupel (i,f(i)) in liste:
             temp = [i,swarm[i].pos_f]
             liste.append(temp)
-        print("repaired particles = ", infeasible)
+        #print("repaired particles = ", infeasible)
+        
         # sort liste from low func values to high func values:
         liste = sorted(liste,key=lambda elem: elem[1])
         # Update xBest and xBest_f if solution is better:
         if (liste[0][1] <= xBest_f):
-            if (abs(liste[0][1]-xBest_f)>1e-3):  # check if global fBest is changing sifnificantly
-                stopCrit = 0
             xBest = swarm[liste[0][0]].pos
             xBest_f = liste[0][1]
         
         print("bestes f = ", xBest_f)
+        #print("Abstand zwischen alter und neuer Loesung: ", numpy.linalg.norm(xBest-xBest_old))
+        xBest_old = xBest
 
-        stopCrit = stopCrit+1
+        if len(stopList) < stopNumber:
+            stopList.append(xBest_f)
+            STOP = False
+        if len(stopList) >= stopNumber:
+            if (abs(stopList[0]-stopList[-1]) < stopTol*stopList[0]):
+                STOP = True           
+            stopList = stopList[1:len(stopList)]
+        
+        # check stopping criteria: ---------------------------------------------
+        if (k==maxiter or STOP):
+            print("Merit Final nach PSO_NM = ", xBest_f)
+            print("xBest nach PSO_NM = ", xBest)
+            print("Norm Gradient nach PSO_NM = ", \
+                numpy.linalg.norm(grad(func,xBest,math.sqrt(numpy.finfo(float).eps))))
+            
+            if improve:
+                def jaco(x):                                #needed for scipy algos
+                    h = math.sqrt(numpy.finfo(float).eps)
+                    return grad(func,x,h)
+    
+                Res = minimize(func,xBest,args=(),method='TNC',jac=jaco, \
+                        bounds=bounds,options={"maxiter":500,"disp":True})
+                print("Merit nach lokaler Suche = ", Res.fun)
+                print("x nach lokaler Suche = ", Res.x)
+                print("Norm Gradient nach lokaler Suche = ", \
+                    numpy.linalg.norm(grad(func,Res.x,math.sqrt(numpy.finfo(float).eps))))
+    
+                if (Res.fun < xBest_f):
+                    xBest_f = Res.fun
+                    xBest = Res.x
 
-        # check stopping criteria:
-        if (k==maxiter):
             return OptimizeResult(fun=xBest_f, x=xBest, nit = k)
             break
-
+        #-----------------------------------------------------------------------
         # Apply Nelder-Mead to the (n+1) best particles:
         initial_simplex = numpy.empty([n+1,n])
         for i in range(n+1):
             initial_simplex[i] = swarm[liste[i][0]].pos
         final_simplex = nelder_mead_con(initial_simplex,func,Cf,bounds.lb,bounds.ub)
         # Update (n+1)th particle:
-        for i in range(n+1):
-            parti = liste[i][0]
-            swarm[parti].updatePos(final_simplex[i])
-            liste[i][1] = swarm[parti].pos_f
+        parti = liste[n][0]
+        swarm[parti].updatePos(final_simplex[0])
+        liste[n][1] = swarm[parti].pos_f
 
         # Update liste:
         liste = sorted(liste,key=lambda elem: elem[1])
-        # Apply PSO to all N particles:
+        
+        # Apply PSO:
         #1.) Determine global best particle:
         gBest = liste[0][0]             # index of global best particle
-        #2.) Divide 20n paritcles in two neighborhoods with 10N particles and
-        #    determine best of these tows:
-        firstN = numpy.arange(n+1,10*n+n+1,dtype=int)
-        secondN = numpy.arange(10*n+n+1,20*n+n+1,dtype=int)
-        random.shuffle(firstN)          # random shuffeling
-        random.shuffle(secondN)         # "
-        for i in range(len(firstN)):
-            first = firstN[i]
-            second = secondN[i]
-            nBest = 0
-            if (liste[first][1] <= liste[second][1]):
-                nBest = liste[first][0]
-            else:
-                nBest = liste[second][0]
-            swarm[liste[first][0]].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)     # update velocity and position
-            swarm[liste[second][0]].update(c0,c1,c2,swarm[gBest].pos,swarm[nBest].pos)
+        
+        if (typ == 1):
+            # Divide 20n paritcles in two neighborhoods with 10N particles and
+            # determine best of these twos:
+            firstN = numpy.arange(n+1,10*n+n+1,dtype=int)
+            secondN = numpy.arange(10*n+n+1,20*n+n+1,dtype=int)
+            random.shuffle(firstN)          # random shuffeling
+            random.shuffle(secondN)         # "
+            for i in range(len(firstN)):
+                first = firstN[i]
+                second = secondN[i]
+                nBest = 0
+                if (liste[first][1] <= liste[second][1]):
+                    nBest = liste[first][0]
+                else:
+                    nBest = liste[second][0]
+                swarm[liste[first][0]].update(c0,c1,c2,gBest=swarm[gBest].pos,nBest=swarm[nBest].pos)     # update velocity and position
+                swarm[liste[second][0]].update(c0,c1,c2,gBest=swarm[gBest].pos,nBest=swarm[nBest].pos)
+        elif (typ == 2):
+            for i in range(20*n):
+                swarm[liste[n+1+i][0]].update(c0,c1,c2,gBest=swarm[gBest].pos)
+        elif (typ == 3):
+            for i in range(S):
+                neighbor = []
+                tempBest_f = 1e100
+                for t in range(len(liste)):
+                    if (swarm[liste[t][0]].NH==i):
+                        neighbor.append(t)
+                        if (swarm[liste[t][0]].best_f < tempBest_f):
+                            tempBest_f = swarm[liste[t][0]].best_f
+                            tempBest = liste[t][0]
+                for t in range(len(neighbor)):
+                    if (neighbor[t] >= n+1):      # only update particles which were not involved in Nelder-Mead-Update
+                        swarm[liste[neighbor[t]][0]].update(c0,c1,c2,gBest=swarm[tempBest].pos)
+        if (typ == 4):
+            # Create neighborhoods with 2 particles per neighborhood:
+            firstN = numpy.arange(0,int(N/2),dtype=int)
+            secondN = numpy.arange(int(N/2),int(N/2)+len(firstN),dtype=int)
+            random.shuffle(firstN)          # random shuffeling
+            random.shuffle(secondN)         # "
+            for i in range(len(firstN)):
+                first = firstN[i]
+                second = secondN[i]
+                if (N%2) and (i==len(firstN)-1):     # N is odd and last loop running
+                    third = N-1
+                nBest = 0
+                if (liste[first][1] <= liste[second][1]):
+                    nBest = liste[first][0]
+                    if (N%2) and (i==len(firstN)-1) and (liste[third][1]<=liste[first][1]):
+                        nBest = liste[third][0]
+                else:
+                    nBest = liste[second][0]
+                    if (N%2) and (i==len(firstN)-1) and (liste[third][1]<=liste[second][1]):
+                        nBest = liste[third][0]
+                swarm[liste[first][0]].update(c0,c1,c2,gBest=swarm[gBest].pos,nBest=swarm[nBest].pos)     # update velocity and position
+                swarm[liste[second][0]].update(c0,c1,c2,gBest=swarm[gBest].pos,nBest=swarm[nBest].pos)
+                if (N%2) and (i==len(firstN)-1):
+                    swarm[liste[third][0]].update(c0,c1,c2,gBest=swarm[gBest].pos,nBest=swarm[nBest].pos)
 
         k = k+1
-
+        
+        """
         # Untersuchung Verteilung der Partikel:
         verteilung = numpy.zeros([n,3])
         for q in range (n):
@@ -1715,6 +1818,8 @@ def PSO_NM(func,x0,args=(),N=None,vel_max=None,maxiter=100,\
                     maxi = temp
             verteilung[q,0] = maxi
         print("verteilung = ",verteilung)
+        """
+
 
 def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     # algorithm based on population based incremental learning
@@ -1724,8 +1829,10 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
     stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
     Np = 3*m          # population size
-    xbest = x0
-    fbest = func(xbest)
+    #xbest = x0
+    #fbest = func(xbest)
+    xbest = numpy.empty(n)
+    fbest = 1e16
     bounds = unknown_options['bounds']
 
     # vector delta is needed to define the subintervalls
@@ -1788,9 +1895,6 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
                     r[i] = j
                     break
         
-        print("P alt = ", P)
-        print("r = ", r)
-
         # Updating der Probability Matrix:
         P_s = numpy.empty([n,m])
         for i in range(n):
@@ -1805,55 +1909,70 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
             for j in range(m):
                 P[i,j] = (1/summe) * P_s[i,j]
 
-        print("P neu = ",P)
         it += 1
                 
 
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
 
 
-def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
+def PopBasIncLearning_hyb(func,x0,args=(),\
+                          Ng=100,m=50,Q=12,typ=1,\
+                          stopNumber=10,stopTol=0.1,\
+                          improve=True,**unknown_options):
     # algorithm based on population based incremental learning
-    # Np = population size; Ng = number of generations; 
-    # m = subintervalls between lower bound and upper bound
+    # typ 1: Gradient is the approximative gradient
+    # typ 2: Gradient is numerical computet
+    # Ng = number of generations (same as MaxIter); 
+    # m = subintervalls between lower bound and upper bound in every component
+    # Q: number of particles for computation of approx_grad (Q>=n)
+    # if fBest doesn't change about (stopTol*100)% in stopNumber iterations -> stop
+    # improve: if true, "TNC" is applied to best find solution to improve solution
+
+    # subfunctions which are needed in this algorithm:
     #---------------------------------------------------------------------------
     def approx_grad(swarm,func,bounds):
         # in swarm are the best and the next Q best particles (its a list with particle objects)
+        # if you choose type 2, you don't compute the approximate but the 
+        # numerical gradient at the point xBest
 
         A = numpy.empty([Q,n])
         b = numpy.empty(Q)
         xbest = swarm[0].pos
         fbest = swarm[0].f
-
-
-        for i in range(Q):
-            for j in range(n):
-                xi = swarm[i+1].pos
-                A[i,j] = xbest[j] - xi[j]
-            fi = swarm[i+1].f
-            b[i] = fbest - fi
-
-        grad = numpy.linalg.pinv(A).dot(b)
-        s = -grad
+        
+        if typ == 1:                                    # approximative gradient
+            for i in range(Q):
+                for j in range(n):
+                    xi = swarm[i+1].pos
+                    A[i,j] = xbest[j] - xi[j]
+                fi = swarm[i+1].f
+                b[i] = fbest - fi
+    
+            gradient = numpy.linalg.pinv(A).dot(b)
+            s = -gradient
+            #print("gradient = ", s)
+        else:                                           # numerical gradient    
+            h = math.sqrt(numpy.finfo(float).eps)
+            s = -grad(func,xbest,h)
 
         NewPart = []        # list for new particle objects
 
         check = 0
-        beta1 = random.uniform(1e-9,1e-6)
-        Pos = xbest + beta1*s
+        beta1 = random.uniform(0,1)     # start value for line-search
+        Pos = line_search_bound(func,beta1,xbest,s,bounds)
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
         else:
             check = 1
-        beta2 = random.uniform(1e-9,1e-6)
-        Pos = xbest + beta2*s
+        beta2 = random.uniform(0,1)     # start value for line-search
+        Pos = line_search_bound(func,beta2,xbest,s,bounds)
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
         else:
             check = 1
 
-        if (check > 0):             # if one of the first two points isn't in feasible region -> stop
-            print("nicht in feasible region")
+        if (check > 0):             # if one of the first two points aren't in feasible region -> stop
+            #print("nicht in feasible region")
             return NewPart
         else:
             # solve LGS T*u=w
@@ -1866,13 +1985,16 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
             # determine z3:
             beta3 = -u[1]/2/u[0]
             Pos = xbest + beta3*s
-            NewPart.append(particle(Pos))
-    
+            if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
+                NewPart.append(particle(Pos))
+            else:
+                #print("Z3 nicht in feasible region")
+                pass
             return NewPart
 
     def EDR(X,t,Ng):          # Evolutionary Direction Recombination
         # X: list with three random particles
-        # t: number of the actual generation (t start from 1)
+        # t: number of the actual generation (t starts from 1)
         # Ng: number of generations (maximum)
         #-----------------------------------------------------------------------
         def SL(t):
@@ -1889,7 +2011,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
         a = numpy.random.normal(loc=0.0, scale=1.0, size=n)
         c = 0.05*a
         s = (X[0].pos-X[1].pos)+(X[0].pos-X[2].pos)+c
-        
+
         # calculate new positions:
         NewPart = []
         Pos = X[0].pos + numpy.random.uniform()*SL(t)*s
@@ -1898,7 +2020,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
         Pos = X[0].pos - numpy.random.uniform()*SL(t)*s
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
-
+        
         return NewPart
 
     class particle:
@@ -1908,14 +2030,10 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
 
 
     #---------------------------------------------------------------------------
-    tolError = 1e-3
-    stopNum = 10        # when best solution isn't changing significantly after 10 iterations then stop
     n = len(x0)         # problem size
-    Np = 3*m          # population size
-    #xbest = x0
-    #fbest = func(xbest)
+    Np = 10*m           # population size
     xbest = numpy.empty(n)
-    fbest = 1e16
+    fbest = float('INF')
     bounds = unknown_options['bounds']
 
     # vector delta is needed to define the subintervalls
@@ -1929,10 +2047,11 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
         for j in range(m):
             P[i,j] = 1/float(m)
 
-    stopTol = 0
     it = 0
+    r_alt = numpy.zeros(n)
+
+    stopList = []
     
-    #while it<Ng:  
     while it<Ng:
         # Update subpopulation with (Np/2) individuals:
         R = [[] for i in range(n)]          # initialization of population list R
@@ -1945,16 +2064,25 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
                     b = bounds.lb[i]+(j+1)*delta[i]
                     R[i].append(random.random()*(b-a)+a)
                     ctr += 1
-            while ctr<int(Np/2):
-                a = bounds.lb[i]
-                b = bounds.ub[i]
-                R[i].append(random.random()*(b-a)+a)     # wo dazu ordnen?
-                ctr += 1
+            #put the remaining particles in intervall of xBest randomly
+            # if it's the first iteration, spread them randomly
+            if (it == 0):
+                while ctr<int(Np/2):
+                    a = bounds.lb[i]
+                    b = bounds.ub[i]
+                    R[i].append(random.random()*(b-a)+a)    
+                    ctr += 1
+            else:
+                while ctr<int(Np/2):
+                    a = bounds.lb[i]+r[i]*delta[i]
+                    b = bounds.lb[i]+(r[i]+1)*delta[i]
+                    R[i].append(random.random()*(b-a)+a)
+                    ctr += 1
         
         # random shuffle of all lines in R
         for i in range(n):
             random.shuffle(R[i])
-        
+
         # create particle objects:
         swarm = []
         for w in range(int(Np/2)):
@@ -2013,6 +2141,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
             print("Verbesserung durch EDO")
 
         print("fbest = ", fbest)
+
         
         # find out in which interval xbest is:
         r = numpy.empty(n)          # safes the interval number j of xbest[i]
@@ -2023,8 +2152,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
                     r[i] = j
                     break
         
-        #print("P alt = ", P)
-        #print("r = ", r)
+        r_alt = r
 
         # Updating der Probability Matrix:
         P_s = numpy.empty([n,m])
@@ -2040,10 +2168,42 @@ def PopBasIncLearning_hyb(func,x0,args=(),Ng=100,m=20,Q=10,**unknown_options):
             for j in range(m):
                 P[i,j] = (1/summe) * P_s[i,j]
 
-        #print("P neu = ",P)
-        it += 1
-                
+        # stopping criteria:
+        if len(stopList) < stopNumber:
+            stopList.append(fbest)
+            STOP = False
+        if len(stopList) >= stopNumber:
+            if (abs(stopList[0]-stopList[-1]) < stopTol*stopList[0]):
+                STOP = True           
+            stopList = stopList[1:len(stopList)]
 
+        it += 1
+
+        if STOP:
+            print("solution doesn't change significantly")
+            break
+             
+    print("Merit Final = ", fbest)
+    print("xBest = ", xbest)
+    print("Norm Gradient = ", \
+        numpy.linalg.norm(grad(func,xbest,math.sqrt(numpy.finfo(float).eps))))
+            
+    if improve:
+        def jaco(x):                                #needed for scipy algos
+            h = math.sqrt(numpy.finfo(float).eps)
+            return grad(func,x,h)
+    
+        Res = minimize(func,xbest,args=(),method='TNC',jac=jaco, \
+                bounds=bounds,options={"maxiter":500,"disp":True})
+        print("Merit nach lokaler Suche = ", Res.fun)
+        print("x nach lokaler Suche = ", Res.x)
+        print("Norm Gradient nach lokaler Suche = ", \
+            numpy.linalg.norm(grad(func,Res.x,math.sqrt(numpy.finfo(float).eps))))
+
+        if (Res.fun < fbest):
+            fbest = Res.fun
+            xbest = Res.x       
+    
     return OptimizeResult(fun=fbest, x=xbest, nit=it+1)
     """
         # loop over all particles:

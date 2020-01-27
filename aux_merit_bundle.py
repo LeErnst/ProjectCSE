@@ -115,6 +115,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
         for i in range(0, numbundles):
             x = np.array([])
             y = np.array([])
+            xChief = np.array([])
+            yChief = np.array([])
 
             # Loop over wavelenghts
             for j in range(0, numwaves):
@@ -125,21 +127,51 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 # to caculate mean
                 x = np.append(x, rpaths[0].raybundles[-1].x[-1, 0, :])
                 y = np.append(y, rpaths[0].raybundles[-1].x[-1, 1, :])
-            
+
+                # penalize overlapping lenses:
+                SubInt = len(rpaths[0].raybundles)-4
+                diff = np.zeros([numrays_true,SubInt])    
+                for w in range(SubInt):
+                    for t in range(len(rpaths[0].raybundles[w+3].x[0,2])):
+                        if math.isnan(rpaths[0].raybundles[w+3].x[-1,2,t]):
+                            pass
+                        else:
+                            diff[t,w] = rpaths[0].raybundles[w+3].x[-1,2,t] -\
+                                        rpaths[0].raybundles[w+3].x[0,2,t]
+                #check for overlapping lenses (negative value in diff):
+                overlap = 0.0
+                for t in range(len(diff)):
+                    for w in range(len(diff[0])):
+                        if (diff[t,w] < 0):
+                            overlap += abs(diff[t,w])
+                res += math.exp(overlap) - 1.0          # wie gewichten?
+
+
+                # compute Chief ray for this wavelength
+                if (len(rpaths[0].raybundles[-1].x[-1,0])>0):
+                    xChief = np.append(xChief, rpaths[0].raybundles[-1].x[-1,0,0])
+                if (len(rpaths[0].raybundles[-1].x[-1,1])>0):            
+                    yChief = np.append(yChief, rpaths[0].raybundles[-1].x[-1,1,0])
             # Add up all the mean values of the different wavelengths
-            xmean = np.mean(x)
-            ymean = np.mean(y)
+            #xmean = np.mean(x)
+            #ymean = np.mean(y)
+
+            # compute mean value of all chief ray points
+            xChiefMean = np.mean(xChief)
+            yChiefMean = np.mean(yChief)
 
             # this could be simplified, for the sake of clarity we do not
             if (penalty == True):
-                res += (math.exp(numrays_true/(len(x)+1e-1))-\
-                        math.exp(numrays_true/(numrays_true+1e-1)))
+                res += (math.exp(numrays_waves/(len(x)+1e-1))-\
+                        math.exp(numrays_waves/(numrays_waves+1e-1)))
 
             # Choose error function
             if (error == 'error2'):
-                res += error2squared(x, xmean, y, ymean)
+                #res += error2squared(x, xmean, y, ymean)
+                res += error2squared(x,xChiefMean,y,yChiefMean)
             elif (error == 'error1'):
-                res += error1(x, xmean, y, ymean)
+                #res += error1(x, xmean, y, ymean)
+                res += error1(x,xChiefMean,y,yChiefMean)
 
         return res
 
