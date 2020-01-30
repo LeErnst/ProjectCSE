@@ -77,7 +77,7 @@ def buildInitialbundle(osa, s, sysseq, rays_list, numrays, wavelength):
 def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                      wavelength=[0.587e-3], whichmeritfunc='standard',
                      error='error2', sample_param='wave', penalty=True,
-                     penaltyVerz=False,f=100):
+                     penaltyVerz=False,f=100.0):
     """
     initializes the initialBundles and forms the meritfunction
     this is necessary as the meritfunction needs the initalbundle, but in the 
@@ -146,9 +146,9 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 overlap = 0.0
                 for t in range(len(diff)):
                     for w in range(len(diff[0])):
-                        if (diff[t,w] < 0):
+                        if (diff[t,w] < 0.0):
                             overlap += abs(diff[t,w])
-                res += math.exp(overlap) - 1          # wie gewichten?
+                res += (overlap+1.0)**(6) - 1.0          # wie gewichten?
                 
                 if (j==0):              # Verzeichnung is only referenced to reference wavelength
                     if penaltyVerz:     # is actual only working for collimated bundles
@@ -157,8 +157,8 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                         SBH = f * math.tan(angle)       # Sollbildhoehe in x Richtung
                         if (len(rpaths[0].raybundles[-1].x[-1,1]) > 0):    # wenn hauptstrahl ueberhaupt auf bild ankommt, dann
                             Y = rpaths[0].raybundles[-1].x[-1,1,0]          # y Komponente des Hauptstrahls auf Bild
-                            if Y > SBH + 0.01*SBH or Y < SBH - 0.01*SBH:
-                                res += math.exp(abs(Y-SBH))                 # wie gewichten???
+                            if Y >= SBH + 0.01*abs(SBH) or Y <= SBH - 0.01*abs(SBH):
+                                res += 1000*(abs(Y-SBH)-(0.01*abs(SBH)))**(2)                 # wie gewichten???
 
 
                 # compute Chief ray of reference wavelength (green one):
