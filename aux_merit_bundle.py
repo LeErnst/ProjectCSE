@@ -76,13 +76,17 @@ def buildInitialbundle(osa, s, sysseq, rays_list, numrays, wavelength):
 
 def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                      wavelength=[0.587e-3], whichmeritfunc='standard',
-                     error='error2', sample_param='wave', penalty=True):
+                     error='error2', sample_param='wave', penalty=True,
+                     penaltyVerz=False,f=100):
     """
     initializes the initialBundles and forms the meritfunction
     this is necessary as the meritfunction needs the initalbundle, but in the 
     optimization the initialBundle is not a Uebergabeparameter. Therefore the 
     meritfunction needs to be wrapped inside the bundle initialisation
+
+    f: Brennweite
     """
+
 
     initialbundle = buildInitialbundle(osa, s, sysseq, rays_dict, 
                                        numrays, wavelength)
@@ -144,34 +148,37 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                     for w in range(len(diff[0])):
                         if (diff[t,w] < 0):
                             overlap += abs(diff[t,w])
-                res += math.exp(overlap) - 1.0          # wie gewichten?
+                res += math.exp(overlap) - 1          # wie gewichten?
+                
+                if (j==0):              # Verzeichnung is only referenced to reference wavelength
+                    if penaltyVerz:     # is actual only working for collimated bundles
+                        # check Verzeichnung: should be smaller than 1%
+                        angle = rays_dict[i]["anglex"]
+                        SBH = f * math.tan(angle)       # Sollbildhoehe in x Richtung
+                        if (len(rpaths[0].raybundles[-1].x[-1,1]) > 0):    # wenn hauptstrahl ueberhaupt auf bild ankommt, dann
+                            Y = rpaths[0].raybundles[-1].x[-1,1,0]          # y Komponente des Hauptstrahls auf Bild
+                            if Y > SBH + 0.01*SBH or Y < SBH - 0.01*SBH:
+                                res += math.exp(abs(Y-SBH))                 # wie gewichten???
 
 
-                # compute Chief ray for this wavelength
-                if (len(rpaths[0].raybundles[-1].x[-1,0])>0):
-                    xChief = np.append(xChief, rpaths[0].raybundles[-1].x[-1,0,0])
-                if (len(rpaths[0].raybundles[-1].x[-1,1])>0):            
-                    yChief = np.append(yChief, rpaths[0].raybundles[-1].x[-1,1,0])
-            # Add up all the mean values of the different wavelengths
-            #xmean = np.mean(x)
-            #ymean = np.mean(y)
-
-            # compute mean value of all chief ray points
-            xChiefMean = np.mean(xChief)
-            yChiefMean = np.mean(yChief)
+                # compute Chief ray of reference wavelength (green one):
+                if (j==0):                      # green w.l. should be in the front
+                    if (len(rpaths[0].raybundles[-1].x[-1,0])>0):
+                        xChief = np.append(xChief, rpaths[0].raybundles[-1].x[-1,0,0])
+                    if (len(rpaths[0].raybundles[-1].x[-1,1])>0):            
+                        yChief = np.append(yChief, rpaths[0].raybundles[-1].x[-1,1,0])
 
             # this could be simplified, for the sake of clarity we do not
             if (penalty == True):
                 res += (math.exp(numrays_waves/(len(x)+1e-1))-\
                         math.exp(numrays_waves/(numrays_waves+1e-1)))
-
             # Choose error function
             if (error == 'error2'):
-                #res += error2squared(x, xmean, y, ymean)
-                res += error2squared(x,xChiefMean,y,yChiefMean)
+                if (len(xChief)>0 and len(yChief)>0):
+                    res += error2squared(x,xChief,y,yChief)
             elif (error == 'error1'):
-                #res += error1(x, xmean, y, ymean)
-                res += error1(x,xChiefMean,y,yChiefMean)
+                if (len(xChief)>0 and len(yChief)>0):
+                    res += error1(x,xChief,y,yChief)
 
         return res
 

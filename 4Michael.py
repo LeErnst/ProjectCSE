@@ -127,7 +127,8 @@ rays_dict=fi1.get_rays_dict()
                                     fi1.numrays, fi1.wavelengths, 
                                     whichmeritfunc='standard', 
                                     error='error2',
-                                    penalty=True)
+                                    penalty=True,
+                                    penaltyVerz=True,f=100)
 
 
 # ----- plot the original system
@@ -191,10 +192,12 @@ benchmark(s,meritfunctionrms,osupdate,methods)
 #****ALS FUNKTION AUSLAGERN???**************************************************
 #*******************************************************************************
 # choose our own backend for testing some algos
-opt_backend = ProjectScipyBackend(optimize_func=PopBasIncLearning_hyb,
+opt_backend = ProjectScipyBackend(optimize_func=PSO_NM_1,
                                   methodparam="standard",
-                                  options={'maxiter': 50, 'xatol': 1e-5,\
-                                           'fatol': 1e-5,'Ng':50})
+                                  options={'maxiter': 100, 'xatol': 1e-5,\
+                                           'fatol': 1e-5,'Ng':1000,\
+                                           'stopNumber':70,'typ':1,'S':12,\
+                                           'improve':True})
 
 # ----- create optimizer object
 optimi = Optimizer(s,
