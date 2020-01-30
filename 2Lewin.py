@@ -131,7 +131,7 @@ sample_param = 'bundle'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                                      numrays, wavelength, 
-                                                     whichmeritfunc='sgd', 
+                                                     whichmeritfunc='sgd2', 
                                                      error='error2',
                                                      sample_param=sample_param,
                                                      penalty=True)
