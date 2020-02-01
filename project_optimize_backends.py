@@ -1916,7 +1916,7 @@ def PopBasIncLearning(func,x0,args=(),Ng=100,m=20,**unknown_options):
 
 
 def PopBasIncLearning_hyb(func,x0,args=(),\
-                          Ng=100,m=50,Q=12,typ=1,\
+                          Ng=100,m=50,Q=20,typ=1,\
                           stopNumber=10,stopTol=0.1,\
                           improve=True,**unknown_options):
     # algorithm based on population based incremental learning
@@ -1931,7 +1931,7 @@ def PopBasIncLearning_hyb(func,x0,args=(),\
     # subfunctions which are needed in this algorithm:
     #---------------------------------------------------------------------------
     def approx_grad(swarm,func,bounds):
-        # in swarm are the best and the next Q best particles (its a list with particle objects)
+        # in swarm are the closest Q particles to xbest (its a list with particle objects)
         # if you choose type 2, you don't compute the approximate but the 
         # numerical gradient at the point xBest
 
@@ -1948,7 +1948,8 @@ def PopBasIncLearning_hyb(func,x0,args=(),\
                 fi = swarm[i+1].f
                 b[i] = fbest - fi
     
-            gradient = numpy.linalg.pinv(A).dot(b)
+            PSI = numpy.linalg.pinv(A)                  # Pseudo-Inverse
+            gradient = PSI.dot(b)
             s = -gradient
             #print("gradient = ", s)
         else:                                           # numerical gradient    
@@ -1958,14 +1959,14 @@ def PopBasIncLearning_hyb(func,x0,args=(),\
         NewPart = []        # list for new particle objects
 
         check = 0
-        beta1 = random.uniform(0,1)     # start value for line-search
-        Pos = line_search_bound(func,beta1,xbest,s,bounds)
+        beta = random.uniform(0,1)     # start value for line-search
+        (Pos,beta1) = line_search_bound(func,beta,xbest,s,bounds)
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
         else:
             check = 1
-        beta2 = random.uniform(0,1)     # start value for line-search
-        Pos = line_search_bound(func,beta2,xbest,s,bounds)
+        beta = random.uniform(0,1)     # start value for line-search
+        (Pos,beta2) = line_search_bound(func,beta,xbest,s,bounds)
         if (numpy.all(Pos>=bounds.lb) and numpy.all(Pos<=bounds.ub)):
             NewPart.append(particle(Pos))
         else:
@@ -2100,7 +2101,15 @@ def PopBasIncLearning_hyb(func,x0,args=(),\
             xbest = swarm[0].pos
 
         # Approsimate Gradient Method:
-        NewPart = approx_grad(swarm[0:Q+1],func,bounds)
+        neighbor = []
+        InputPart = []
+        for l in range(len(swarm)):
+            dis = numpy.linalg.norm(swarm[0].pos-swarm[l].pos)
+            neighbor.append((swarm[l],dis))
+        neighbor = sorted(neighbor,key=lambda elem: elem[1])
+        for l in range (Q+1):
+            InputPart.append(neighbor[l][0])
+        NewPart = approx_grad(InputPart,func,bounds)
 
         # Add new particles to swarm:
         swarm.extend(NewPart)

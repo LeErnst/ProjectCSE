@@ -768,19 +768,19 @@ def line_search_bound(func,beta0,x,d,bounds):
     f_alt = func(x)
     x_neu = x + beta*d
     while not (np.all(x_neu>=bounds.lb) and np.all(x_neu<=bounds.ub)):
-        beta = beta * 0.8
+        beta = beta * 0.5
         if beta < 1e-9:
             print("beta zu klein")
-            return
+            return (x_neu,beta)
         x_neu = x + beta*d
     while not (func(x_neu) < f_alt):
-        beta = beta * 0.8
+        beta = beta * 0.5
         if beta < 1e-9:
             print("beta zu klein 2")
-            return
+            return (x_neu,beta)
         x_neu = x + beta*d
     
-    return x_neu
+    return (x_neu,beta)
 
 
 def resettingAlgo(func, gradf, x_k, p_k, alpha, 
