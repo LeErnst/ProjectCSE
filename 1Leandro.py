@@ -51,6 +51,9 @@ from project_optimize_backends import (ProjectScipyBackend,\
                                        test_minimize_neldermead,\
                                        sgd,\
                                        gradient_descent)
+
+from ipm import basicipm
+
 # --- debugging 
 from pyrateoptics import listOptimizableVariables
 
@@ -169,9 +172,9 @@ def osupdate(my_s):
 # possible methodparams = {standard, penalty, penalty-lagrange, log}
 
 # for problems increase the stepsize
-opt_backend = ProjectScipyBackend(optimize_func='cg',#differential-evolution',#nelder-mead',#test_minimize_neldermead,
-                                  methodparam='penalty-lagrange',
-                                  options={'maxiter': 150, 'gtol':1e-2})#,
+opt_backend = ProjectScipyBackend(optimize_func=basicipm,#sqp_ipm,#differential-evolution',#nelder-mead',#test_minimize_neldermead,
+                                  methodparam='standard',
+                                  options={'maxiter' : 1, 'reduced':True})#,
                                             #'xatol': 1e-14,
                                             #'fatol': 1e-14})
 
