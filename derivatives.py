@@ -47,7 +47,7 @@ def get_stochastic_grad(optimi, initialbundle, sample_param='wave'):
     if (sample_param == 'ray'):
         sample_range *= wavel*numrays
 
-    def stochastic_grad(func, x, h):
+    def stochastic_grad(func, x, h, *args):
         dim = len(x)
         sgrad = numpy.zeros_like(x)
         E = numpy.eye(dim,dim)
@@ -62,11 +62,23 @@ def get_stochastic_grad(optimi, initialbundle, sample_param='wave'):
         for i in range(dim):
             sgrad[i] = (func(x+h*E[i,:]) - func(x-h*E[i,:]))/(2*h)
 
+        if (len(args) > 0):
+            sgrad2 = numpy.zeros_like(x)
+            for i in range(dim):
+                sgrad2[i] = (func(args[0]+h*E[i,:])-func(args[0]-h*E[i,:]))/(2*h)
+            sgrad2 *= sample_range
+
+        # asure that the expectation of the stochastic gradient is the gradient
+        sgrad *= sample_range
+
         # reset the meritparams in Optimizer-class, such that the full merit-
         # functionrms is evaluated
         optimi.meritparameters = {}
 
-        return sgrad
+        if (len(args) > 0):
+            return [sgrad,sgrad2]
+        else:
+            return sgrad
     
     return stochastic_grad
 

@@ -4,6 +4,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.ticker as ticker
 from mpl_toolkits import mplot3d
 from matplotlib import cm
 
@@ -649,7 +650,7 @@ def termcondition(fk, fk_1, xk, xk_1, gk, thetaf=1e-3, p=None):
 
 
 def plot2d(xarray, yarray,
-           fig=1,
+           fignum=1,
            title='',
            fonttitle=14,
            xlabel='',
@@ -662,43 +663,55 @@ def plot2d(xarray, yarray,
            ylim='auto',
            xlog=False,
            ylog=False,
+           xticks='auto',
+           yticks='auto',
+           axformat='sci',
            grid=True,
            linewidth=2,
-           linestyle='-o',
+           linestyle='-',
+           color='red',
+           marker='o',
            markersize=2,
            save=False,
            name='plot2d.png',
            show=False,
            *args):
 
-    plt.figure(fig)
-    plt.plot(xarray, yarray, 
-             linestyle, 
-             lw=linewidth, 
-             markersize=markersize, 
-             label=legend)
+    fig = plt.figure(fignum)
+    ax = fig.add_subplot(1, 1, 1)
+    # set plot
+    ax.plot(xarray, yarray, linewidth=linewidth, linestyle=linestyle, 
+            marker=marker, markersize=markersize, label=legend)
+    ax.legend(loc=loclegend)
     # axis
-    plt.xlabel(xlabel, fontsize=fontaxis)
-    plt.ylabel(ylabel, fontsize=fontaxis)
+    ax.set_xlabel(xlabel, fontsize=fontaxis)
+    ax.set_ylabel(ylabel, fontsize=fontaxis)
+    if type(xticks) is np.ndarray:
+        ax.set_xticks(xticks)
+        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    if type(yticks) is np.ndarray:
+        ax.set_yticks(yticks)
+        ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
+    ax.yaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
+    ax.ticklabel_format(axis='both', style=axformat)
     # log scale
     if (xlog==True):
-        plt.xscale('log')
+        ax.set_xscale('log')
     if (ylog==True):
-        plt.yscale('log')
+        ax.set_yscale('log')
     # set xlim and ylim
-    if not (xlim=='auto'):
-        plt.xlim(xlim[0],xlim[1])
-    if not (ylim=='auto'):
-        plt.ylim(ylim[0],ylim[1])
+    if type(xlim) is np.ndarray:
+        ax.set_xlim(xlim[0],xlim[1])
+    if type(ylim) is np.ndarray:
+        ax.set_ylim(ylim[0],ylim[1])
     # title
     # remark: matplotlib accepts Tex $ $-expressions,
     #         like plt.title(r'$\sigma_{i}=15$'), where the r indicates that the
     #         backslash is not to treat like in python, but in latex
-    plt.title(title, fontsize=fonttitle)
-    # set legend
-    plt.legend(loc=loclegend, prop={'size': fontlegend})
+    ax.set_title(title, fontsize=fonttitle)
     # set grid
-    plt.grid(grid)
+    ax.grid(grid)
     # safe 
     if (save==True):
         plt.savefig(name)
@@ -708,7 +721,7 @@ def plot2d(xarray, yarray,
 
 
 def plot3d(X, Y, Z,
-           fig=1,
+           fignum=1,
            title='',
            fonttitle=14,
            xlabel='',
@@ -727,7 +740,7 @@ def plot3d(X, Y, Z,
            show=False,
            *args):
 
-    fig = plt.figure(fig)
+    fig = plt.figure(fignum)
     ax = plt.axes(projection='3d')
     # set plot
     ax.plot_surface(X, Y, Z, cmap=cm.coolwarm)

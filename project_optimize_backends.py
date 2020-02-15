@@ -104,10 +104,15 @@ class ProjectScipyBackend(Backend):
             while (1): 
                 # define the gradient for the penalty method
                 if (self.stochagradparam == True):
-                    def stochagrad_total(x):
-                        res = self.stochagrad(self.func, x, h) + \
-                              grad_pen(x,self.bdry,self.tauk)
-                        return res
+                    def stochagrad_total(x,*args):
+                        res = self.stochagrad(self.func, x, h, *args)
+                        if (len(args) > 0):
+                            res[0] += grad_pen(x,self.bdry,self.tauk)
+                            res[1] += grad_pen(x,self.bdry,self.tauk)
+                            return res
+                        else:
+                            res += grad_pen(x,self.bdry,self.tauk)
+                            return res
                     def grad_total(x):
                         res = grad(self.func, x, h) + \
                               grad_pen(x,self.bdry,self.tauk)
@@ -186,10 +191,15 @@ class ProjectScipyBackend(Backend):
              
                 # define the gradient for the penalty-lagrange-function
                 if (self.stochagradparam == True):
-                    def stochagrad_total(x):
-                        res = self.stochagrad(self.func, x, h) + \
-                              grad_lag(x,self.bdry,self.tauk,self.lamk)
-                        return res
+                    def stochagrad_total(x,*args):
+                        res = self.stochagrad(self.func, x, h, *args)
+                        if (len(args) > 0):
+                            res[0] += grad_lag(x,self.bdry,self.tauk,self.lamk)
+                            res[1] += grad_lag(x,self.bdry,self.tauk,self.lamk)
+                            return res
+                        else:
+                            res += grad_lag(x,self.bdry,self.tauk,self.lamk)
+                            return res
                     def grad_total(x):
                         res = grad(self.func, x, h) + \
                               grad_lag(x,self.bdry,self.tauk,self.lamk)
@@ -384,6 +394,7 @@ def sgd(func, x0, args,
     pathf    - return path of func if it is true
     plot     - plot iterations-functionvalues if it is true
     plotset  - plot settings
+    rang     - parameter to run the stochastic algorithm rang times
 
     Output: OptimizeResult-object from scipy
 
@@ -396,7 +407,251 @@ def sgd(func, x0, args,
     iternum    = 0
     xk_1       = x0
     fk_1       = func(x0)
-    path       = numpy.empty(maxiter+1)
+    path       = numpy.zeros(maxiter+1)
+    path[0]    = fk_1
+    stepsize_k = stepsize
+    timepath   = numpy.zeros(maxiter+1)
+
+    # momentum vector
+    vk_1 = numpy.zeros(len(x0))
+    rang = 1
+    if not (methods == 'gradient'):
+        rang = 1
+    for i in range(rang):
+        xk_1     = x0
+        iternum  = 0
+        timepath = numpy.zeros(maxiter+1)
+        while (1):
+            # update iteration number
+            iternum += 1
+            # measure elapsed time
+            #start = time.time()
+            # choose the method
+            if (methods == 'vanilla'):
+                # vanilla sgd
+                stochagrd_k = stochagrad(xk_1)
+                #stepsize_k = armijo(func, gradient, xk_1, -stochagrd_k, 
+                #                         stepsize, 1e-3, 1e-1, 4e-1)
+                vk   = stepsize_k*stochagrd_k
+            if (methods == 'momentum'):
+                # momentum vector
+                vk   = gamma*vk_1+stepsize*stochagrad(xk_1)
+                vk_1 = vk
+            if (methods == 'nag'):
+                # nesterov accelerated gradient
+                vk   = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
+                vk_1 = vk
+            if (methods == 'gradient'):
+                # gradient descent
+                grad_k = gradient(xk_1)
+                #stepsize_k = armijo(func, gradient, xk_1, -grad_k, 
+                #                    stepsize, 1e-3, 1e-1, c=9e-1)
+                vk   = stepsize_k*grad_k
+
+            # iteration rule
+            xk = xk_1 - vk 
+            # debugging
+            fk = func(xk)
+            gk = gradient(xk)
+            gknorm = numpy.linalg.norm(gk, numpy.inf)
+
+            # debugging
+            print('gknorm = %7.4f' %(gknorm))
+            print('fk     = %7.4f' %(fk))
+#            printArray('gk =', gk)
+
+            # update path
+            path[iternum] += fk
+            # time
+            #end = time.time()
+            #timepath[iternum] = timepath[iternum-1]+(end-start)
+
+            # termination
+            if ((iternum >= maxiter) or (gknorm <= gradtol)):
+                break
+            xk_1 = xk
+            fk_1 = fk
+
+
+    if not (methods=='gradient'):
+        path = (1./rang)*path
+
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+        #timepath = numpy.delete(timepath, range(iternum+1, maxiter))
+
+    # return path of func if desired
+    if (pathf==True):
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
+
+    return result
+
+
+def nag_splitted(func, x0, args, 
+                 maxiter=500,
+                 stepsize1=1e-2,
+                 stepsize2=1e-9,
+                 gamma=0.9,
+                 gradtol=1500,
+                 pathf=False,
+                 plot=False,
+                 plotset={},
+                 **kwargs):
+
+    '''
+    nag-Algorithm with stiff splitted stepsize
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    methods  - the method options, possible:
+               vanilla : sgd
+               momentum: sgd with momentum
+               nag     : nesterovs accelerated gradient
+               gradient: gradient decent with real gradient
+    gamma    - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+    rang     - parameter to run the stochastic algorithm rang times
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Ruder, Sebastian. "An overview of gradient descent optimization algorithms."
+    arXiv preprint arXiv:1609.04747 (2016).
+    '''
+    gradient   = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    iternum    = 0
+    xk_1       = x0
+    fk_1       = func(x0)
+    path       = numpy.zeros(maxiter+1)
+    path[0]    = fk_1
+    timepath   = numpy.zeros(maxiter+1)
+
+    # momentum vector
+    vk_1 = numpy.zeros(len(x0))
+    vk   = numpy.zeros(len(x0))
+    rang = 5
+    for i in range(rang):
+        xk_1     = x0
+        iternum  = 0
+        timepath = numpy.zeros(maxiter+1)
+        while (1):
+            # update iteration number
+            iternum += 1
+            # nesterov accelerated gradient
+            sgradk_1 = stochagrad(xk_1-gamma*vk_1)
+            vk[0:9:1]    = gamma*vk_1[0:9:1] +stepsize1*sgradk_1[0:9:1]
+            vk[9:17:1]   = gamma*vk_1[9:17:1]+stepsize2*sgradk_1[9:17:1]
+            vk_1 = vk
+
+            # iteration rule
+            xk = xk_1 - vk
+
+            # debugging
+            fk = func(xk)
+            gk = gradient(xk)
+            gknorm = numpy.linalg.norm(gk, numpy.inf)
+
+            # debugging
+            print('gknorm = %7.4f' %(gknorm))
+            print('fk     = %7.4f' %(fk))
+#            printArray('gk =', gk)
+
+            # update path
+            path[iternum] += fk
+            # time
+            #end = time.time()
+            #timepath[iternum] = timepath[iternum-1]+(end-start)
+
+            # termination
+            if ((iternum >= maxiter) or (gknorm <= gradtol)):
+                break
+            xk_1 = xk
+            fk_1 = fk
+
+
+    if not (methods=='gradient'):
+        path = (1./rang)*path
+
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+        #timepath = numpy.delete(timepath, range(iternum+1, maxiter))
+
+    # return path of func if desired
+    if (pathf==True):
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
+
+    return result
+
+def sgdRestart(func, x0, args, 
+               maxiter=500,
+               stepsize=1e-9,
+               methods='vanilla',
+               gamma=0.9,
+               gradtol=1500,
+               sumtol=1,
+               pathf=False,
+               plot=False,
+               plotset={},
+               **kwargs):
+
+    '''
+    Stochastic gradient descent with restart and with options. 
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    methods  - the method options, possible:
+               vanilla : sgd
+               momentum: sgd with momentum
+               nag     : nesterovs accelerated gradient
+               gradient: gradient decent with real gradient
+    gamma    - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Ruder, Sebastian. "An overview of gradient descent optimization algorithms."
+    arXiv preprint arXiv:1609.04747 (2016).
+    '''
+    gradient   = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    iternum    = 0
+    xk_1       = x0
+    fk_1       = func(x0)
+    path       = numpy.zeros(maxiter+1)
     path[0]    = fk_1
     stepsize_k = stepsize
 
@@ -404,30 +659,32 @@ def sgd(func, x0, args,
     vk_1 = numpy.zeros(len(x0))
 
     while (1):
-        # update iteration number
-        iternum += 1
+        for i in range(15):
+            # update iteration number
+            iternum += 1
 
-        # choose the method
-        if (methods == 'vanilla'):
-            # vanilla sgd
-            stochagrd_k = stochagrad(xk_1)
-            stepsize_k = armijo(func, gradient, xk_1, -stochagrd_k, 
-                                     stepsize, 1e-3, 1e-1, 4e-1)
-            vk   = stepsize_k*stochagrd_k
-        if (methods == 'momentum'):
-            # momentum vector
-            vk   = gamma*vk_1+stepsize*stochagrad(xk_1)
-            vk_1 = vk
-        if (methods == 'nag'):
-            # nesterov accelerated gradient
-            vk   = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
-            vk_1 = vk
-        if (methods == 'gradient'):
-            # gradient descent
-            vk   = stepsize*gradient(xk_1)
+            # choose the method
+            if (methods == 'vanilla'):
+                # vanilla sgd
+                vk   = stepsize_k*stochagrad(xk_1)
+            if (methods == 'momentum'):
+                # momentum vector
+                vk   = gamma*vk_1+stepsize*stochagrad(xk_1)
+                vk_1 = vk
+            if (methods == 'nag'):
+                # nesterov accelerated gradient
+                vk   = gamma*vk_1+stepsize*stochagrad(xk_1-gamma*vk_1)
+                vk_1 = vk
+            if (methods == 'gradient'):
+                # gradient descent
+                vk   = stepsize*gradient(xk_1)
 
-        # iteration rule
-        xk = xk_1 - vk 
+            # iteration rule
+            xk = xk_1 - vk 
+            # update path
+            path[iternum] = func(xk)
+            xk_1 = xk
+
         # debugging
         fk = func(xk)
         gk = gradient(xk)
@@ -438,13 +695,25 @@ def sgd(func, x0, args,
         print('fk     = %7.4f' %(fk))
 #        printArray('gk =', gk)
 
-        # update path
-        path[iternum] = fk
+        # update sumdiff
+        sumdiff = numpy.absolute(path[iternum]-path[iternum-15])
+        print(sumdiff)
+
         # termination
         if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
-        xk_1 = xk
-        fk_1 = fk
+ 
+        # check restart
+        if (sumdiff < sumtol):
+            print('restart')
+            sgdRestart(func, xk, args=(),
+                       maxiter=maxiter-iternum+1, stepsize=stepsize*1.05, 
+                       methods=methods,
+                       gamma=gamma, gradtol=gradtol, sumtol=sumtol, 
+                       pathf=pathf,
+                       plot=False, plotset=plotset, **kwargs)
+            break
+                        
 
     # cut off the path
     if not (iternum==maxiter):
@@ -462,6 +731,7 @@ def sgd(func, x0, args,
 
 
     return result
+
 
 
 def adam(func, x0, args, 
@@ -493,6 +763,8 @@ def adam(func, x0, args,
     pathf    - return path of func if it is true
     plot     - plot iterations-functionvalues if it is true
     plotset  - plot settings
+    rang     - parameter to run the stochastic algorithm rang times
+    lambda   - parameter for beta 1 (see paper)
 
     Output: OptimizeResult-object from scipy
 
@@ -506,48 +778,58 @@ def adam(func, x0, args,
     iternum    = 0
     xk_1       = x0
     fk_1       = func(x0)
-    path       = numpy.empty(maxiter+1)
+    path       = numpy.zeros(maxiter+1)
     path[0]    = fk_1
+    beta1k     = beta1
+    stepsizek  = stepsize
+    #lam        = 0.98
+    rang = 5
+    for i in range(rang):
+        iternum = 0
+        xk_1 = x0
+        # 1st moment vector
+        mk_1 = numpy.zeros(len(x0))
+        # 2nd moment vector
+        vk_1 = numpy.zeros(len(x0))
 
-    # 1st moment vector
-    mk_1 = numpy.zeros(len(x0))
-    # 2nd moment vector
-    vk_1 = numpy.zeros(len(x0))
+        while (1):
+            # update iteration number
+            iternum += 1
+            # calculate beta1_k and alpha_k
+            # option from the paper
+            #beta1k     = beta1*numpy.power(lam,iternum-1)
+            #stepsizek  = stepsize/numpy.power(iternum,0.5)
+            # get stochastic gradient
+            gk = stochagrad(xk_1)
+            # update first moment estimate
+            mk   = beta1k*mk_1+(1-beta1k)*gk
+            mk_1 = mk
+            # update second moment estimate
+            vk   = beta2*vk_1+(1-beta2)*numpy.power(gk,2)
+            vk_1 = vk
+            # compute bias-corrected first moment estimate
+            mk_hat = mk/(1-numpy.power(beta1k,iternum))
+            # compute bias-corrected first moment estimate
+            vk_hat = vk/(1-numpy.power(beta2,iternum))
 
-    while (1):
-        # update iteration number
-        iternum += 1
-        # get stochastic gradient
-        gk = stochagrad(xk_1)
-        # update first moment estimate
-        mk   = beta1*mk_1+(1-beta1)*gk
-        mk_1 = mk
-        # update second moment estimate
-        vk   = beta2*vk_1+(1-beta2)*numpy.power(gk,2)
-        vk_1 = vk
-        # compute bias-corrected first moment estimate
-        mk_hat = mk/(1-numpy.power(beta1,iternum))
-        # compute bias-corrected first moment estimate
-        vk_hat = vk/(1-numpy.power(beta2,iternum))
+            # iteration rule
+            xk = xk_1 - stepsizek*mk_hat/(numpy.power(vk_hat,0.5)+epsilon)
 
-#        printArray('stepsize*mk_hat/(sqrt(vk_hat)+epsilon) =',stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon))
+            fk = func(xk)
+            gk = gradient(xk)
+            gknorm = numpy.linalg.norm(gk, numpy.inf)
+            print('gknorm = %7.4f' %(gknorm))
+            print('fk     = %7.4f' %(fk))
 
-        # iteration rule
-        xk = xk_1 - stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon)
+            # update path
+            path[iternum] += fk
+            # termination
+            if ((iternum >= maxiter) or (gknorm <= gradtol)):
+                break
+            xk_1 = xk
+            fk_1 = fk
 
-        fk = func(xk)
-        gk = gradient(xk)
-        gknorm = numpy.linalg.norm(gk, numpy.inf)
-        print('gknorm = %7.4f' %(gknorm))
-        print('fk     = %7.4f' %(fk))
-
-        # update path
-        path[iternum] = fk
-        # termination
-        if ((iternum >= maxiter) or (gknorm <= gradtol)):
-            break
-        xk_1 = xk
-        fk_1 = fk
+    path = (1./rang)*path
 
     # cut off the path
     if not (iternum==maxiter):
@@ -566,19 +848,21 @@ def adam(func, x0, args,
     return result
 
 
-def adamax(func, x0, args, 
-           maxiter=300,
-           stepsize=1e-2,
-           beta1=0.09,
-           beta2=0.99,
-           gradtol=1500,
-           pathf=False,
-           plot=False,
-           plotset={},
-           **kwargs):
+def adamRestart(func, x0, args, 
+                maxiter=300,
+                stepsize=1e-2,
+                beta1=0.1,
+                beta2=0.99,
+                epsilon=1e-2,
+                gradtol=1500,
+                sumtol=1,
+                pathf=False,
+                plot=False,
+                plotset={},
+                **kwargs):
 
     '''
-    Adaptive moment estimation - based on Adam: Adam generalized to p-norms 
+    Adaptive moment estimation with restart - based on sgd
 
     Input:
     func     - function to be optimized
@@ -589,7 +873,9 @@ def adamax(func, x0, args,
     stepsize - stepsize for the update of x
     beta1    - parameter for the momentum
     beta2    - parameter for the momentum
+    epsilon  - parameter for the momentum
     gradtol  - tolerance for real gradient termination condition
+    sumtol   - tolerance for the sum over the last 6 func values
     pathf    - return path of func if it is true
     plot     - plot iterations-functionvalues if it is true
     plotset  - plot settings
@@ -615,33 +901,160 @@ def adamax(func, x0, args,
     vk_1 = numpy.zeros(len(x0))
 
     while (1):
-        iternum += 1
-        # get stochastic gradient
-        gk = stochagrad(xk_1)
-        # update first moment estimate
-        mk   = beta1*mk_1+(1-beta1)*gk
-        mk_1 = mk
-        # update second moment estimate
-        vk   = numpy.maximum(beta2*vk_1, numpy.absolute(gk))
-        vk_1 = vk
-        # iteration rule
-        xk = xk_1 - (stepsize/(1-numpy.power(beta1,iternum)))*mk/vk
+        for i in range(6):
+            # update iteration number
+            iternum += 1
+            # get stochastic gradient
+            gk = stochagrad(xk_1)
+            # update first moment estimate
+            mk   = beta1*mk_1+(1-beta1)*gk
+            mk_1 = mk
+            # update second moment estimate
+            vk   = beta2*vk_1+(1-beta2)*numpy.power(gk,2)
+            vk_1 = vk
+            # compute bias-corrected first moment estimate
+            mk_hat = mk/(1-numpy.power(beta1,iternum))
+            # compute bias-corrected first moment estimate
+            vk_hat = vk/(1-numpy.power(beta2,iternum))
+            # iteration rule
+            xk = xk_1 - stepsize*mk_hat/(numpy.power(vk_hat,0.5)+epsilon)
+            # update path
+            path[iternum] = func(xk)
+            xk_1 = xk
 
         fk = func(xk)
         gk = gradient(xk)
         gknorm = numpy.linalg.norm(gk, numpy.inf)
         print('gknorm = %7.4f' %(gknorm))
         print('fk     = %7.4f' %(fk))
-#        printArray('delta_x =', (stepsize/(1-numpy.power(beta1,iternum)))*mk/vk)
 
+        # update sumdiff
+        sumdiff = numpy.absolute(path[iternum]-path[iternum-6])
+        print(sumdiff)
 
-        # update path
-        path[iternum] = fk
         # termination
         if ((iternum >= maxiter) or (gknorm <= gradtol)):
             break
-        xk_1 = xk
-        fk_1 = fk
+
+        # check restart
+        if (sumdiff < sumtol):
+            print('restart')
+            res = adamRestart(func, xk, args=(), maxiter=maxiter, 
+                              stepsize=stepsize*1.1,
+                              beta1=beta1, beta2=beta2, epsilon=epsilon, 
+                              gradtol=gradtol, pathf=pathf, plot=False, 
+                              plotset={}, **kwargs)
+            break
+
+
+    # cut off the path
+    if not (iternum==maxiter):
+        path = numpy.delete(path, range(iternum+1, maxiter)) 
+
+    # return path of func if desired
+    if (pathf==True):
+        result = OptimizeResult(fun=path, x=xk, nit=iternum)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=iternum)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
+    return result
+
+def adamax(func, x0, args, 
+           maxiter=300,
+           stepsize=1e-2,
+           beta1=0.09,
+           beta2=0.99,
+           epsilon=1e-5,
+           gradtol=1500,
+           pathf=False,
+           plot=False,
+           plotset={},
+           **kwargs):
+
+    '''
+    Adaptive moment estimation - based on Adam: Adam generalized to p-norms 
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    beta1    - parameter for the momentum
+    beta2    - parameter for the momentum
+    gradtol  - tolerance for real gradient termination condition
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+    rang     - parameter to run the stochastic algorithm rang times
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Kingma, Diederik P., and Jimmy Ba. "Adam: A method for stochastic 
+    optimization." arXiv preprint arXiv:1412.6980 (2014).
+    '''
+
+    gradient   = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    iternum    = 0
+    xk_1       = x0
+    fk_1       = func(x0)
+    path       = numpy.zeros(maxiter+1)
+    path[0]    = fk_1
+    beta1k     = beta1
+    stepsizek  = stepsize
+
+    # 1st moment vector
+    mk_1 = numpy.zeros(len(x0))
+    # 2nd moment vector
+    vk_1 = numpy.zeros(len(x0))
+    rang = 5
+
+    for i in range(rang):
+        iternum = 0
+        xk_1 = x0
+        # 1st moment vector
+        mk_1 = numpy.zeros(len(x0))
+        # 2nd moment vector
+        vk_1 = numpy.zeros(len(x0))
+
+        while (1):
+            iternum += 1
+            # get stochastic gradient
+            gk = stochagrad(xk_1)
+            # calculate beta1_k and alpha_k
+            # update first moment estimate
+            mk   = beta1k*mk_1+(1-beta1k)*gk
+            mk_1 = mk
+            # update second moment estimate
+            vk   = numpy.maximum(beta2*vk_1, numpy.absolute(gk))
+            vk_1 = vk
+            # iteration rule
+            xk = xk_1 - (stepsizek/(1-numpy.power(beta1,iternum)))*\
+                                                                 mk/(vk+epsilon)
+
+            fk = func(xk)
+            gk = gradient(xk)
+            gknorm = numpy.linalg.norm(gk, numpy.inf)
+            #print('gknorm = %7.4f' %(gknorm))
+            #print('fk     = %7.4f' %(fk))
+
+            # update path
+            path[iternum] += fk
+            # termination
+            if ((iternum >= maxiter) or (gknorm <= gradtol)):
+                break
+            xk_1 = xk
+            fk_1 = fk
+
+    # path update
+    path = (1./rang)*path
 
     # cut off the path
     if not (iternum==maxiter):
@@ -686,6 +1099,7 @@ def adagrad(func, x0, args,
     pathf    - return path of func if it is true
     plot     - plot iterations-functionvalues if it is true
     plotset  - plot settings
+    rang     - parameter to run the stochastic algorithm rang times
 
     Output: OptimizeResult-object from scipy
 
@@ -704,32 +1118,41 @@ def adagrad(func, x0, args,
     G          = numpy.zeros(dim)
     path       = numpy.empty(maxiter+1)
     path[0]    = fk_1
+    rang       = 5
 
-    while (1):
-        # update iteration number
-        iternum += 1
-        # get stochastic gradient
-        gk = stochagrad(xk_1)
-        # update G
-        G += gk*gk
-        # iteration rule
-        xk = xk_1 - stepsize*(gk/(numpy.sqrt(G)+epsilon))
+    for i in range(rang):
+        iternum = 0
+        xk_1 = x0
+        G = numpy.zeros(dim)
 
-        # debugging
-        fk = func(xk)
-        gk = gradient(xk)
-        gknorm = numpy.linalg.norm(gk, numpy.inf)
-        print('gknorm = %7.4f' %(gknorm))
-        print('fk     = %7.4f' %(fk))
-#        printArray('gk =', gk)
+        while (1):
+            # update iteration number
+            iternum += 1
+            # get stochastic gradient
+            gk = stochagrad(xk_1)
+            # update G
+            G += gk*gk
+            # iteration rule
+            xk = xk_1 - stepsize*(gk/(numpy.sqrt(G)+epsilon))
 
-        # update path
-        path[iternum] = fk
-        # termination
-        if ((iternum >= maxiter) or (gknorm <= gradtol)):
-            break
-        xk_1 = xk
-        fk_1 = fk
+            # debugging
+            fk = func(xk)
+            gk = gradient(xk)
+            gknorm = numpy.linalg.norm(gk, numpy.inf)
+#            print('gknorm = %7.4f' %(gknorm))
+#            print('fk     = %7.4f' %(fk))
+#            printArray('gk =', gk)
+
+            # update path
+            path[iternum] += fk
+            # termination
+            if ((iternum >= maxiter) or (gknorm <= gradtol)):
+                break
+            xk_1 = xk
+            fk_1 = fk
+
+    # path update
+    path = (1./rang)*path
 
     # cut off the path
     if not (iternum==maxiter):
@@ -773,6 +1196,7 @@ def adadelta(func, x0, args,
     pathf    - return path of func if it is true
     plot     - plot iterations-functionvalues if it is true
     plotset  - plot settings
+    rang     - parameter to run the stochastic algorithm rang times
 
     Output: OptimizeResult-object from scipy
 
@@ -791,40 +1215,50 @@ def adadelta(func, x0, args,
     Exk_1      = numpy.zeros(dim)
     path       = numpy.empty(maxiter+1)
     path[0]    = fk_1
+    rang       = 5
 
-    while (1):
-        # update iteration number
-        iternum += 1
-        # get stochastic gradient
-        gk = stochagrad(xk_1)
-        # accumulate gradient
-        Egk   = roh*Egk_1+(1-roh)*gk*gk
-        Egk_1 = Egk
-        # calculate RMS[g]_k and RMS[delta x]_k-1
-        RMSg = numpy.sqrt(Egk  +epsilon)
-        RMSx = numpy.sqrt(Exk_1+epsilon)
-        # delta
-        delta_xk = -(RMSx/RMSg)*gk
-        # iteration rule
-        xk = xk_1 + delta_xk
-        # accumulate updates
-        Exk   = roh*Exk_1+(1-roh)*delta_xk*delta_xk
-        Exk_1 = Exk
+    for i in range(rang):
+        iternum = 0
+        xk_1 = x0
+        Egk_1      = numpy.zeros(dim)
+        Exk_1      = numpy.zeros(dim)
 
-        # debugging
-        fk = func(xk)
-        gk = gradient(xk)
-        gknorm = numpy.linalg.norm(gk, numpy.inf)
-        print('gknorm = %7.4f' %(gknorm))
-        print('fk     = %7.4f' %(fk))
+        while (1):
+            # update iteration number
+            iternum += 1
+            # get stochastic gradient
+            gk = stochagrad(xk_1)
+            # accumulate gradient
+            Egk   = roh*Egk_1+(1-roh)*gk*gk
+            Egk_1 = Egk
+            # calculate RMS[g]_k and RMS[delta x]_k-1
+            RMSg = numpy.sqrt(Egk  +epsilon)
+            RMSx = numpy.sqrt(Exk_1+epsilon)
+            # delta
+            delta_xk = -(RMSx/RMSg)*gk
+            # iteration rule
+            xk = xk_1 + delta_xk
+            # accumulate updates
+            Exk   = roh*Exk_1+(1-roh)*delta_xk*delta_xk
+            Exk_1 = Exk
 
-        # update path
-        path[iternum] = fk
-        # termination
-        if ((iternum >= maxiter) or (gknorm <= gradtol)):
-            break
-        xk_1 = xk
-        fk_1 = fk
+            # debugging
+            fk = func(xk)
+            gk = gradient(xk)
+            gknorm = numpy.linalg.norm(gk, numpy.inf)
+#            print('gknorm = %7.4f' %(gknorm))
+#            print('fk     = %7.4f' %(fk))
+
+            # update path
+            path[iternum] += fk
+            # termination
+            if ((iternum >= maxiter) or (gknorm <= gradtol)):
+                break
+            xk_1 = xk
+            fk_1 = fk
+
+    # path update
+    path = (1./rang)*path
 
     # cut off the path
     if not (iternum==maxiter):
@@ -841,6 +1275,160 @@ def adadelta(func, x0, args,
         plot2d(range(len(path)), path, **plotset)
 
     return result
+
+
+def SdLBFGS(func, x0, args, 
+            maxiter=100,
+            stepsize=1,
+            etha=1e-9,
+            p=5,
+            delta=10,
+            gradtol=1500,
+            pathf=False,
+            plot=False,
+            plotset={},
+            **kwargs):
+
+    '''
+    Stochastic damped L-BSGF
+
+    Input:
+    func     - function to be optimized
+    x0       - initial value
+    args     - additional arguments for the func, is ignored within this algo, 
+               but scipy requires this
+    maxiter  - maximum number of iterations
+    stepsize - stepsize for the update of x
+    gradtol  - tolerance for real gradient termination condition
+    p        - parameter for memory
+    delta    - see paper
+    etha     - see paper
+    pathf    - return path of func if it is true
+    plot     - plot iterations-functionvalues if it is true
+    plotset  - plot settings
+
+    Output: OptimizeResult-object from scipy
+
+    Source: 
+    Xiao Wang u. a. “Stochastic quasi-Newton methods for nonconvex stochastic 
+    optimization”. In: SIAM Journal on Optimization 27.2 (2017), S. 927–956.
+
+    '''
+
+    gradient   = kwargs['grad']
+    stochagrad = kwargs['stochagrad']
+    k          = 1
+    xk         = x0
+    fk         = func(x0)
+    path       = numpy.empty(maxiter+1)
+    path[0]    = fk
+    S     = numpy.zeros((p, len(x0)))
+    Yhat  = numpy.zeros((p, len(x0)))
+    Rho   = numpy.zeros(p)
+    H1=numpy.eye(len(x0),len(x0))
+    # compute the first step
+    xk1  = xk - etha*numpy.dot(H1,stochagrad(xk)) 
+    xk_1 = xk   # x0
+    xk   = xk1  # x1
+
+    while (1):
+        # update iteration number
+        k += 1
+        # set up values
+        gkprime, gk_1 = stochagrad(xk, xk_1)
+        gk = stochagrad(xk)
+        # call update func
+        S, Yhat, Rho, vk = update_step(xk, xk_1, 
+                                       gk, gk_1, gkprime, 
+                                       S, Yhat, Rho, 
+                                       k, p, delta)
+        # debugging
+        #print(S)
+        #print(Yhat)
+        #print(Rho)
+        print(stepsize*vk)
+        # iteration rule
+        xk1 = xk - stepsize*vk
+
+        fk1 = func(xk1)
+        gk1 = gradient(xk1)
+        gknorm = numpy.linalg.norm(gk1, numpy.inf)
+        print('gknorm = %7.4f'   %(gknorm))
+        print('fk+1     = %7.4f' %(fk1))
+
+        # update path
+        path[k] = fk1
+        # termination
+        if ((k >= maxiter) or (gknorm <= gradtol)):
+            break
+        xk = xk1
+        fk = fk1
+
+    # cut off the path
+    if not (k==maxiter):
+        path = numpy.delete(path, range(k+1, maxiter)) 
+
+    # return path of func if desired
+    if (pathf==True):
+        result = OptimizeResult(fun=path, x=xk, nit=k)
+    else:
+        result = OptimizeResult(fun=fk, x=xk, nit=k)
+
+    # plot if desired
+    if (plot==True):
+        plot2d(range(len(path)), path, **plotset)
+
+    return result
+
+
+def update_step(xk, xk_1, gk, gk_1, gkprime, S, Yhat, Rho, k, p, delta):
+    '''
+    algorithm for determining the hesse approximation
+    see paper for description
+    maybe it is false implemented
+    '''
+    ui   = gk
+    # new s_k-1
+    sk_1 = xk-xk_1
+    yk_1 = gkprime-gk_1
+    gammak = numpy.maximum(numpy.dot(yk_1,yk_1)/numpy.dot(sk_1,sk_1),delta)
+    sk_1yk_1 = numpy.dot(sk_1,yk_1)
+    sk_1sk_1 = 0.25*gammak*numpy.dot(sk_1,sk_1)
+    if (sk_1yk_1 < sk_1sk_1):
+        phik_1 = (3*sk_1sk_1)/(4*sk_1sk_1-sk_1yk_1)
+    else:
+        phik_1 = 1
+    # new yhat_k-1
+    yhatk_1 = phik_1*yk_1 + (1-phik_1)*gammak*sk_1
+    # new rho_k-1
+    rhok_1  = 1/(numpy.dot(sk_1,yhatk_1))
+    # update matrizes S, Yhat, Rho
+    rang      = numpy.minimum(p, k-1)
+    S   [p-1] = sk_1
+    Yhat[p-1] = yhatk_1
+    Rho [p-1] = rhok_1
+    MU        = numpy.zeros(p)
+
+    for i in range(rang):
+        MU[i] = Rho[p-i-1]*numpy.dot(ui,S[p-i-1])
+        ui   -= MU[i]*Yhat[p-i-1]
+
+    vi = (1/gammak)*ui
+    #TODO: this part is not clear, where does the values in S, Yhat and Rho 
+    #      come from for p > k
+    for i in range(rang):
+        j = 1
+        if ((rang >= p) and (i==0)):
+            j=0
+        nyi = Rho[p-i-rang]*numpy.dot(vi,Yhat[p-i-rang])
+        vi += (MU[p-i-1]-nyi)*S[p-i-rang]
+        # update the matrizes
+        S   [p-i-rang] = S   [p-i-rang-j]
+        Yhat[p-i-rang] = Yhat[p-i-rang-j]
+        Rho [p-i-rang] = Rho [p-i-rang-j]
+
+    return (S, Yhat, Rho, vi)
+    
 
 
 def get_scipy_stochastic_hybrid(stocha_opt_func, scipy_opt_func):
@@ -931,6 +1519,9 @@ def gradient_descent(func, x0, args=(),
                      delta_max=1e-1,
                      gradtol=500,
                      **kwargs):
+    '''
+    Simple gradient descent algorithm for test purposes.
+    '''
     xk = x0
     grad = kwargs['grad']
     iternum = 0 
@@ -969,7 +1560,7 @@ def gradient_descent(func, x0, args=(),
 
 def gd_splitted_stepsize(func, x0, args=(),
                          maxiter=100, 
-                         stepsize1=5e-1, 
+                         stepsize1=1e-2, 
                          stepsize2=1e-9, 
                          stepsize_max=1e+2, 
                          roh=0.1,
@@ -979,6 +1570,9 @@ def gd_splitted_stepsize(func, x0, args=(),
                          delta_max=1e-1,
                          gradtol=500,
                          **kwargs):
+    '''
+    Gradient descent with splitted step size. Only to investigate the behavier.
+    '''
     xk = x0
     grad = kwargs['grad']
     iternum = 0 
@@ -989,17 +1583,18 @@ def gd_splitted_stepsize(func, x0, args=(),
         iternum += 1
         # determine stepsize
         gk_1 = grad(xk)
-        func1 = lambda x: func(numpy.append(x, xk[9:17:1]))
-        func2 = lambda x: func(numpy.append(xk[0:9:1], x))
-        grad1 = lambda x: grad(numpy.append(x, xk[9:17:1]))[0:9:1]
-        grad2 = lambda x: grad(numpy.append(xk[0:9:1], x))[9:17:1]
+        #func1 = lambda x: func(numpy.append(x, xk[9:17:1]))
+        #func2 = lambda x: func(numpy.append(xk[0:9:1], x))
+        #grad1 = lambda x: grad(numpy.append(x, xk[9:17:1]))[0:9:1]
+        #grad2 = lambda x: grad(numpy.append(xk[0:9:1], x))[9:17:1]
 
-        stepsize1_k = strongwolfe(func1, grad1, xk[0:9:1], -grad1(xk[0:9:1]), 
-                                 stepsize1_k, stepsize_max,
-                                 c1, c2, 50)
-        stepsize2_k = strongwolfe(func2, grad2, xk[9:17:1], -grad2(xk[9:17:1]), 
-                                 stepsize2_k, stepsize_max,
-                                 c1, c2, 50)
+        #TODO: I dont know whether this makes sense.
+        #stepsize1_k = strongwolfe(func1, grad1, xk[0:9:1], -grad1(xk[0:9:1]), 
+        #                         stepsize1_k, stepsize_max,
+        #                         c1, c2, 50)
+        #stepsize2_k = strongwolfe(func2, grad2, xk[9:17:1], -grad2(xk[9:17:1]), 
+        #                         stepsize2_k, stepsize_max,
+        #                         c1, c2, 50)
         xk[0:9:1] -= stepsize1_k*gk_1[0:9:1]
         xk[9:17:1] -= stepsize2_k*gk_1[9:17:1]
         printArray('xk =', xk) 
@@ -1034,7 +1629,9 @@ def plot2d_meritfunction(func, x0, args=(),
                          interval=None,
                          plotset={},
                          **kwargs):
-
+    '''
+    Function to plot the meritfunction.
+    '''
     mf = numpy.empty(disk)
     dim = len(x0)
     x = x0
@@ -1068,7 +1665,9 @@ def plot3d_meritfunction(func, x0, args=(),
                          interval2=None,
                          plotset={},
                          **kwargs):
-
+    '''
+    Function to plot the meritfunction.
+    '''
     mf = numpy.empty((disk, disk))
     dim = len(x0)
     x = x0
@@ -1117,6 +1716,9 @@ def test_minimize_neldermead(func, x0, args=(),
                              maxiter=100, 
                              xatol=1e-6, fatol=1e-6,
                              **unknown_options):
+    '''
+    Nelder Mead algortihm for testing the scipy backend optimize.
+    '''
     alpha = 1
     beta = 2
     gamma = 0.5

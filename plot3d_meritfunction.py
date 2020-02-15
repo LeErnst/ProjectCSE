@@ -127,14 +127,15 @@ rays_dict = fi1.get_rays_dict()
 
 #wavelength = [0.5875618e-3, 0.4861327e-3, 0.6562725e-3]
 #numrays = 50
-sample_param = 'wave'
+sample_param = 'bundle'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                                      fi1.numrays, fi1.wavelengths, 
-                                                     whichmeritfunc='sgd', 
+                                                     whichmeritfunc='sgd2', 
                                                      error='error2',
                                                      sample_param=sample_param,
-                                                     penalty=False)
+                                                     penalty=True,
+                                                     penaltyVerz=True)
 
 
 # ----- plot the original system
@@ -174,7 +175,7 @@ def osupdate(my_s):
 
 # possible methodparams = {standard, penalty, penalty-lagrange, log}
 
-plotsettings = {'fig'       : 3,
+plotsettings = {'fignum'    : 3,
                 'title'     : 'curvature-curvature-meritfunction-plot surf4/surf8',
                 'xlabel'    : 'curvature surf4',
                 'ylabel'    : 'curvature surf8',
@@ -186,8 +187,8 @@ plotsettings = {'fig'       : 3,
 # options for meritfunctionplot
 options_s1 = {'gtol'     : 1e+10,
               'disk'     : 50,
-              'plotvar1' : 9,
-              'plotvar2' : 10,
+              'plotvar1' : 13,
+              'plotvar2' : 14,
               'interval1': None,
               'interval2': None,
               'plotset'  : plotsettings}

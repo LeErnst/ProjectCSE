@@ -1,12 +1,6 @@
-# template to create a optical system which is optimized
-# including the necessary classes, functions and libraries
-# by patrick, leandro, michael, lewin
-
 # lewin has created this file for testing some algorithms and to not change the 
 # original file (01_..), which is the main file for patricks changes (outsourcing
-# some functions and so on). i will use this file only for testing until the 
-# main.py script is made and i will not change any functions or classes which
-# have patrick/leandro created
+# some functions and so on). i will use this file only for testing 
 
 
 # --- general
@@ -131,7 +125,7 @@ sample_param = 'bundle'
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
                                                      numrays, wavelength, 
-                                                     whichmeritfunc='sgd2', 
+                                                     whichmeritfunc='sgd1', 
                                                      error='error2',
                                                      sample_param=sample_param,
                                                      penalty=True)

@@ -341,9 +341,6 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
             if (sample_param == 'wave'):
                 sample_initialbundle = [initialbundle[sample_num//numwaves]\
                                                      [sample_num%numwaves]]
-                raise ValueError('This definition of the meritfunctionrms is \
-                                  not available for this type of sample_param.\
-                                  Try sample_param == bundle.')
 
             # Loop over sample_initialbundle
             x = np.array([])
@@ -384,7 +381,7 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 res += (overlap+1.0)**(6) - 1.0
                 # distortion for reference wavelength but only when all 
                 # wavelengths are considered
-                if (j==0 and sample_param == 'bundle'):
+                if (i==0 and sample_param == 'bundle'):
                     if penaltyVerz: # only working for collimated bundles
                         # check distortion: should be smaller than 1%
                         angle = rays_dict[i]["anglex"]
@@ -399,7 +396,7 @@ def get_bundle_merit(osa, s, sysseq, rays_dict, numrays=10,
                 # bundle, because the drawn bundle doesnt have to be the green
                 # wavelength and therefore no reference chief ray is computed
                 # compute Chief ray of reference wavelength (green one):
-                if (j==0):# green wavelength should be the first entry
+                if (i==0):# green wavelength should be the first entry
                     if (len(rpaths[0].raybundles[-1].x[-1,0])>0):
                         xChief = \
                            np.append(xChief, rpaths[0].raybundles[-1].x[-1,0,0])
