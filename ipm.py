@@ -18,7 +18,7 @@ from auxiliary_functions import get_bdry, eval_h, eval_c, my_log, printArray,\
 
 from numpy.linalg import inv 
 
-def basicipm(func, x, bdry, args,
+def basicipm(func, x, args,
             reduced=False,
             maxiter=50,
             stepsize=1e-7,  # for Hesse Matrix/Gradient
@@ -27,41 +27,45 @@ def basicipm(func, x, bdry, args,
     '''
     Basic interior point method for nonconvex functions
     '''
-    
+    m = 2*len(kwargs['bounds'].lb)
+    bdry = numpy.zeros(m)
+    for i in range(m/2):
+        bdry[2*i]   = kwargs['bounds'].lb[i]
+        bdry[2*i+1] = kwargs['bounds'].ub[i]
+    print(bdry)
+
     niter = 0
     n     = len(x)
-    m     = len(bdry)
     #starting parameter
     z     = numpy.ones(m)
     s     = numpy.ones(m)
     my    = 20.0
     delta_old = 0
-
+    #textdummy = open("DUMMY3.txt", "a")
+    gradtol = 0.000000001
     #setup A
     A = numpy.zeros((m,n))
     for i in range(n) :
         A[2*i,i]   =  1.0
         A[2*i+1,i] = -1.0
 
-    c_x = eval_c(x, bdry)
-    while(numpy.linalg.norm(grad(func, x, stepsize))>gradtol and niter<maxiter) :
+    #c_x = eval_c(x, bdry)
+    #temp = 20
+    #while (numpy.linalg.norm(grad(func, x, stepsize))>gradtol and niter<maxiter) :
+    while niter<3 :
         niter = niter + 1
-        print('NITER=')
-        print(niter)
-        error = ipm_error(func, x, A, c_x, z, s, my)
-        erroralt = 0
+        #print('NITER=')
+        #print(niter)
+        #error = ipm_error(func, x, A, c_x, z, s, my, textdummy)
+        #erroralt = 0
         testit = 0
-        while (error > my and numpy.abs(erroralt-error)>1.0 and testit<2) :
-            print('Innere Schleife')
-            print(testit)
-            print('MY=')
-            print(my)
+        #while (error > 30*my and testit<22) :
+        while (testit<22) :
             testit = testit + 1
-            erroralt = error
+            #erroralt = error
             print('INERTIA CORRECTION....')
             delta, gamma = inertia_correction_ldl(setup_Jac_ipm, func, A, x, z, s, my, delta_old, a=1, b=0.5)
-            #delta = 1
-            #delta = inertia_correction_gersh(setup_Jac_ipm(func, A, x, z, s))
+            #delta =1
             print('INERTIA CORRETION Done')
             print('DELTA=')
             print(delta)
@@ -70,15 +74,14 @@ def basicipm(func, x, bdry, args,
                 x,s,z = solve_ipm_newton(setup_F_ipm_reduced, setup_Jac_ipm_reduced, func, A, x, z, s, my, bdry, delta, delta_old, reduced=reduced, variant='gmres')
             else :
                 x,s,z = solve_ipm_newton(setup_F_ipm, setup_Jac_ipm, func, A, x, z, s, my, bdry, delta, delta_old, reduced=reduced, variant='gmres')
-            error = ipm_error(func, x, A, c_x, z, s, my)
-            print('ERROR IST')
-            print(error)
-            print('ERROR DIFFERENZ')
-            print(numpy.abs(erroralt-error))
+            #error = ipm_error(func, x, A, c_x, z, s, my, textdummy)
             delta_old = delta
-            #my = my/2
-        my = my/2
-        #my = update_my(s,z)
+            wertwert= func(x)
+        #my = my/2
+        my = update_my(s,z)
+        print('#################################################################')
+        print('NEW MY IS')
+        print(my)
     result = OptimizeResult(fun=func, x=x, nit=niter)
     print('gradient=')
     print(numpy.linalg.norm(grad(func, x, stepsize)))
@@ -121,11 +124,28 @@ def solve_ipm_newton(F, DF, f, A, x, z, s, my, bdry, delta, delta_old, reduced=F
     '''
     n = len(x)
     m = len(z)
-    tol = 200
-    maxit = 7#20#300
+    tol = 0.00000000000001
+    maxit = 1#7#20#300
     nit   = 0
     fval  = F(f, A, x, z, s, my, bdry)
+
+    text = open("AuswertungIPM.txt", "a")
+    #text.write("error1 error2 error3 NewtonIter delta meritwert error Fval gradMerit my\r\n")
+    dummy = 1
     while(1) :
+
+        merwertneu=f(x)
+        ####################TEXTFILE#####################################
+        c_x = eval_c(x, bdry)
+        error = ipm_error(f, x, A, c_x, z, s, my, text)
+        merwert=merwertneu
+        print('MERITWERT IN NEWTON=')
+        print(merwert)
+        text.write("%d %.4f %.4f %.4f %.4f %.4f %.4f\r\n" % (nit, delta, merwert, error, numpy.linalg.norm(fval), numpy.linalg.norm(grad(f,x,stepsize)), my))    
+
+        #################################################################
+        #print('FVAL IN NEWTON')
+        #print(fval)
         #fval  = F(f, A, x, z, s, my, bdry)
         if numpy.linalg.norm(fval) < tol or nit>=maxit :
             break
@@ -155,26 +175,33 @@ def solve_ipm_newton(F, DF, f, A, x, z, s, my, bdry, delta, delta_old, reduced=F
             ps = ps - numpy.dot(siginv, pz) - s
 
             als, alz = get_alphas(s, z, ps, pz)
-            #print('pz in Newton')
-            #print(-alz*pz)
-            #print('ps in Newton')
-            #print(als*ps)
             #x,s= filter_meth(f, x , als, dx_ges, s, ps, bdry, my) 
-            x  = x + als * dx_ges
-            s  = s + als * ps
-            z  = z - alz * pz
-            #print('Z in NEwton')
-            #print(z)
-            #print('S in NEwton')
-            #print(s)
+            
+            #if dummy and merwertneu<0.31 :
+            #    dummy = 0
 
+            if (1) : #(my==20.0) :
+                x  = x + als * dx_ges
+                s  = s + als * ps
+                z  = z + alz * pz
+            else :
+                print('SCHRITTWEITE ANPASSEN!!!!!!!!!')
+                for i in range(10) :
+                    x  = x + (als/(i+1)) * dx_ges
+                    s  = s + (als/(i+1)) * ps
+                    z  = z + (alz/(i+1)) * pz
+                    merwertneu = f(x)
+                    if merwertneu<merwert :
+                        break
+                
+            fval  = F(f, A, x, z, s, my, bdry)
         else :
             ps    = dx_ges[n:n+m]
             pz    = dx_ges[n+m:n+m+m]
             als, alz = get_alphas(s, z, ps, pz)
             x = x + als * dx_ges[0:n]
             s = s + als * ps
-            z = z - alz * pz
+            z = z + alz * pz
 
         fvalt = fval
         fval  = F(f, A, x, z, s, my, bdry)
@@ -381,8 +408,8 @@ def inertia_correction_ldl(J, f, A, x, z, s, my, delta_old, a=1, b=0.5) :
             print('ACHTUNG!!!MATRIX KONNTE NICHT POSITIV DEFINIT GEMACHT WERDEN')
             return delta,gamma
         else:
-            print('NICHT AKZEPTIERTES DELTA IST')
-            print(delta)
+            #print('NICHT AKZEPTIERTES DELTA IST')
+            #print(delta)
             delta = delta*10
 
 def get_alphas(s, z, ps, pz, tau=0.995) :
@@ -553,24 +580,25 @@ def setup_Jac_ipm_reduced(f, A, x, z, s, delta=0):
 
     return J
             
-def ipm_error(f, x, A, c_x, z, s, my, stepsize=1e-9):
+def ipm_error(f, x, A, c_x, z, s, my, text, stepsize=1e-9):
     a = numpy.subtract(grad(f,x,stepsize),numpy.dot(numpy.transpose(A), z))
-    print('INSIDE ERROR')
-    print('grad =')
-    print(numpy.linalg.norm(grad(f,x,stepsize)))
+    #print('INSIDE ERROR')
+    #print('grad =')
+    #print(numpy.linalg.norm(grad(f,x,stepsize)))
     
-    print('AT*z')
-    print(numpy.linalg.norm(numpy.dot(numpy.transpose(A), z)))
-    print('zusammen')
-    print(numpy.linalg.norm(a))
+    #print('AT*z')
+    #print(numpy.linalg.norm(numpy.dot(numpy.transpose(A), z)))
+    #print('zusammen')
+    #print(numpy.linalg.norm(a))
     b = numpy.subtract(numpy.dot(numpy.diag(s), z), my*numpy.ones(len(z)))
-    print('Sz-mye')
-    print(numpy.linalg.norm(b))
+    #print('Sz-mye')
+    #print(numpy.linalg.norm(b))
     c = numpy.linalg.norm(numpy.subtract(c_x, s))
-    print('C(x)-s')
-    print(c)
+    #print('C(x)-s')
+    #print(c)
+    text.write("%.4f %.4f %.4f" % (numpy.linalg.norm(a), numpy.linalg.norm(b), c))
 
-    res = max(numpy.linalg.norm(a), numpy.linalg.norm(b), numpy.linalg.norm(c))
+    res = max(numpy.linalg.norm(a), numpy.linalg.norm(b), c)
 
     return res
 

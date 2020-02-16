@@ -121,9 +121,9 @@ wavelength = [0.58749e-3]#, 0.6562725e-3]
 numrays = 10
 
 (initialbundle, meritfunctionrms) = get_bundle_merit(osa, s, sysseq, rays_dict,
-                                    numrays, wavelength, 
-                                    whichmeritfunc='standard', 
-                                    error='error2')
+                                    fi1.numrays, fi1.wavelengths, 
+                                    whichmeritfunc='standard2', 
+                                    error='error2', penaltyVerz=True)
 
 
 # ----- plot the original system
@@ -132,16 +132,16 @@ pn = np.array([1, 0, 0])
 up = np.array([0, 1, 0])
 
 fig = plt.figure(1)
-ax1 = fig.add_subplot(211)
-ax2 = fig.add_subplot(212)
-ax1.axis('equal')
+#ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(111)
+#ax1.axis('equal')
 ax2.axis('equal')
 
 # --- plot the bundles and draw the original system
 # first it is necessary to copy the initialbundle, as it's gonna be changed
 # inside of the seqtrace function (called inside of plotBundles)
 testbundle = deepcopy(initialbundle)
-plotBundles(s, initialbundle, sysseq, ax1, pn, up)
+#plotBundles(s, initialbundle, sysseq, ax1, pn, up)
 
 
 # IV ----------- optimization
